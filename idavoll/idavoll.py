@@ -29,8 +29,12 @@ class IdavollService(component.Service):
         xmlstream.addObserver(IQ_SET, self.iqFallback, -1)
 
     def getFeatures(self, node):
+        features = []
+
         if not node:
-            return [NS_DISCO_ITEMS, NS_VERSION]
+            features.extend([NS_DISCO_ITEMS, NS_VERSION])
+
+        return features
     
     def onVersion(self, iq):
         iq.swapAttributeValues("to", "from")
@@ -52,7 +56,7 @@ class IdavollService(component.Service):
                 if hasattr(c, "getFeatures"):
                     features.extend(c.getFeatures(node))
 
-        if not features and not identities and not node:
+        if node and not features and not identities:
             xmpp_error.error_from_iq(iq, 'item-not-found')
         else:
             iq.swapAttributeValues("to", "from")
@@ -110,10 +114,9 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
-    if config['backend'] == 'memory':
-        bsc = b.NodeCreationService()
-        bsc.setServiceParent(bs)
-        component.IService(bsc).setServiceParent(sm)
+    bsc = b.NodeCreationService()
+    bsc.setServiceParent(bs)
+    component.IService(bsc).setServiceParent(sm)
 
     s = IdavollService()
     s.setServiceParent(sm)
