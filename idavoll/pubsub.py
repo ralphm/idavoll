@@ -1,6 +1,8 @@
 from twisted.protocols.jabber import component,jid
 from twisted.xish import utility, domish
 from twisted.python import components
+from twisted.internet import defer
+
 import backend
 import xmpp_error
 
@@ -22,6 +24,25 @@ PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 
+class PubSubError(Exception):
+	pubsub_error = None
+	msg = ''
+
+class NotImplemented(PubSubError):
+	pass
+
+class OptionsUnavailable(PubSubError):
+	pubsub_error = 'subscription-options-unavailable'
+
+class SubscriptionOptionsUnavailable(PubSubError):
+	pubsub_error = 'subscription-options-unavailable'
+
+class NodeNotConfigurable(PubSubError):
+	pubsub_error = 'node-not-configurable'
+
+class CreateNodeNotConfigurable(PubSubError):
+	pubsub_error = 'node-not-configurable'
+
 error_map = {
 	backend.NotAuthorized:			'not-authorized',
 	backend.NodeNotFound:			'item-not-found',
@@ -29,28 +50,19 @@ error_map = {
 	backend.PayloadExpected:		'bad-request',
 	backend.NoInstantNodes:			'not-acceptable',
 	backend.NodeExists:				'conflict',
+	NotImplemented:					'feature-not-implemented',
+	OptionsUnavailable:				'feature-not-implemented',
+	SubscriptionOptionsUnavailable:	'not-acceptable',
+	NodeNotConfigurable:			'feature-not-implemented',
+	CreateNodeNotConfigurable:		'not-acceptable',
 }
 
-class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
+class ComponentServiceFromBackend(component.Service):
 
 	def __init__(self, backend):
-		utility.EventDispatcher.__init__(self)
 		self.backend = backend
 		self.backend.pubsub_service = self
-		self.addObserver(PUBSUB_PUBLISH, self.onPublish)
-
-		# make sure subscribe and create are handled before resp. options and
-		# configure
-		self.addObserver(PUBSUB_SUBSCRIBE, self.onSubscribe, 0)
-		self.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet, 1)
-		self.addObserver(PUBSUB_CREATE, self.onSubscribe, 0)
-		self.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet, 1)
-
-		self.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
-		self.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
-		self.addObserver(PUBSUB_GET, self.notImplemented, -1)
-		self.addObserver(PUBSUB_SET, self.notImplemented, -1)
-
+		
 	def componentConnected(self, xmlstream):
 		xmlstream.addObserver(PUBSUB_SET, self.onPubSub)
 		xmlstream.addObserver(PUBSUB_GET, self.onPubSub)
@@ -76,6 +88,11 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		try: 
 			r = failure.trap(*error_map.keys())
 			xmpp_error.error_from_iq(iq, error_map[r], failure.value.msg)
+			if isinstance(failure.value, PubSubError) and \
+			   failure.value.pubsub_error is not None:
+				iq.error.addElement((NS_PUBSUB_ERRORS,
+					                 failure.value.pubsub_error),
+									NS_PUBSUB_ERRORS)
 			return iq
 		except:
 			xmpp_error.error_from_iq(iq, 'internal-server-error')
@@ -88,14 +105,34 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		iq.children = result or []
 		return iq
 
-	def notImplemented(self, iq):
-		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented'))
-
 	def onPubSub(self, iq):
-		self.dispatch(iq)
+		for elem in iq.pubsub.elements():
+			if not elem.hasAttribute('xmlns'):
+				action = elem.name
+				break
+
+		if not action:
+			return
+
+		try:
+			try:
+				handler = getattr(self, 'on%s%s' % (action.capitalize(),
+													iq["type"].capitalize()))
+			except KeyError:
+				raise NotImplemented
+			else:
+				d = handler(iq)
+		except:
+			d = defer.fail()
+				
+		d.addCallback(self.success, iq)
+		d.addErrback(self.error, iq)
+		d.addCallback(self.send)
 		iq.handled = True
 
-	def onPublish(self, iq):
+	# action handlers
+
+	def onPublishSet(self, iq):
 		node = iq.pubsub.publish["node"]
 
 		items = []
@@ -105,45 +142,25 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 
 		print items
 
-		d = self.backend.do_publish(node, jid.JID(iq["from"]).userhost(), items)
-		d.addCallback(self.success, iq)
-		d.addErrback(self.error, iq)
-		d.addCallback(self.send)
+		return self.backend.do_publish(node,
+				                       jid.JID(iq["from"]).userhost(),
+									   items)
 
 	def onOptionsGet(self, iq):
-		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
-		iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
-		self.send(iq)
+		raise OptionsUnavailable
 
 	def onOptionsSet(self, iq):
-		if iq.pubsub.subscribe:
-			# this should be handled by the subscribe handler
-			return
-
-		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
-		iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
-		self.send(iq)
+		raise OptionsUnavailable
 
 	def onConfigureGet(self, iq):
-		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
-		iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
-		self.send(iq)
+		raise NodeNotConfigurable
 
 	def onConfigureSet(self, iq):
-		if iq.pubsub.create:
-			# this should be handled by the create handler
-			return
+		raise NodeNotConfigurable
 
-		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
-		iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
-		self.send(iq)
-
-	def onSubscribe(self, iq):
+	def onSubscribeSet(self, iq):
 		if iq.pubsub.options:
-			xmpp_error.error_from_iq(iq, 'not-acceptable')
-			iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
-			self.send(iq)
-			return
+			raise SubscribeOptionsUnavailable
 
 		node_id = iq.pubsub.subscribe["node"]
 		subscriber = jid.JID(iq.pubsub.subscribe["jid"])
@@ -163,8 +180,27 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		entity["subscription"] = result["subscription"]
 		return reply
 
-	def do_notification(self, list, node):
+	def onCreateSet(self, iq):
+		if iq.pubsub.options:
+			raise CreateNodeNotConfigurable
 
+		node = iq.pubsub.create["node"]
+		owner = jid.JID(iq["from"]).userhostJID()
+
+		d = self.backend.create_node(node, owner)
+		d.addCallback(self.return_create_response, iq)
+		return d
+
+	def return_create_response(self, result, iq):
+		if iq.pubsub.create["node"] is None:
+			reply = domish.Element('pubsub', NS_PUBSUB)
+			entity = reply.addElement('create')
+			entity['node'] = result['node_id']
+			return reply
+
+	# other methods
+
+	def do_notification(self, list, node):
 		for recipient, items in list.items():
 			self.notify(node, items, recipient)
 
@@ -178,31 +214,5 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		items.children.extend(itemlist)
 		self.send(message)
 		
-	def onCreate(self, iq):
-		if iq.pubsub.options:
-			xmpp_error.error_from_iq(iq, 'not-acceptable')
-			iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
-			self.send(iq)
-			return
-
-		node = iq.pubsub.create["node"]
-		owner = jid.JID(iq["from"]).userhostJID()
-
-		try:
-			d = self.backend.create_node(node, owner)
-			d.addCallback(self.return_create_response, iq)
-			d.addCallback(self.succeed, iq)
-			d.addErrback(self.error, iq)
-			d.addCallback(self.send)
-		except:
-			pass
-
-	def return_create_response(self, result, iq):
-		if iq.pubsub.create["node"] is None:
-			reply = domish.Element('pubsub', NS_PUBSUB)
-			entity = reply.addElement('create')
-			entity['node'] = result['node_id']
-			return reply
-
 components.registerAdapter(ComponentServiceFromBackend, backend.IBackendService, component.IService)
 
