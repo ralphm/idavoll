@@ -15,12 +15,13 @@ PUBSUB_GET = IQ_GET + PUBSUB_ELEMENT
 PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
+PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
+PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 
 error_map = {
 	backend.NotAuthorized:			'not-authorized',
 	backend.NodeNotFound:			'item-not-found',
 	backend.NoPayloadAllowed:		'bad-request',
-	backend.EmptyPayloadExpected:	'bad-request',
 	backend.PayloadExpected:		'bad-request',
 }
 
@@ -31,6 +32,10 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		self.backend = backend
 		self.backend.pubsub_service = self
 		self.addObserver(PUBSUB_PUBLISH, self.onPublish)
+		self.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
+		self.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
+		self.addObserver(PUBSUB_GET, self.notImplemented, -1)
+		self.addObserver(PUBSUB_SET, self.notImplemented, -1)
 
 	def componentConnected(self, xmlstream):
 		xmlstream.addObserver(PUBSUB_SET, self.onPubSub)
@@ -48,6 +53,9 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		iq["type"] = 'result'
 		iq.children = []
 		return iq
+
+	def notImplemented(self, iq):
+		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented'))
 
 	def onPubSub(self, iq):
 		self.dispatch(iq)
@@ -67,6 +75,12 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		d.addCallback(self.success, iq)
 		d.addErrback(self.error, iq)
 		d.addCallback(self.send)
+
+	def onOptionsGet(self, iq):
+		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented', 'No subscriber options available'))
+
+	def onConfigureGet(self, iq):
+		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented', 'Node can not be configured'))
 
 	def do_notification(self, list, node):
 
