@@ -108,12 +108,6 @@ class IAffiliationsService(components.Interface):
         and subscriptions.
         """
 
-class IPersistenceService(components.Interface):
-    """ A service for persisting published items """
-
-    def store_items(self, node_id, items, publisher):
-        """ Store items for a node, recording the publisher """
-
 class IRetractionService(components.Interface):
     """ A service for retracting published items """
 
@@ -149,9 +143,13 @@ class BackendService(service.MultiService, utility.EventDispatcher):
     def get_supported_affiliations(self):
         return ['none', 'owner', 'outcast', 'publisher']
 
+class PublishService(service.Service):
+    
+    __implements__ = IPublishService,
+
     def publish(self, node_id, items, requestor):
-        d1 = self.storage.get_node_configuration(node_id)
-        d2 = self.storage.get_affiliation(node_id, requestor.full())
+        d1 = self.parent.storage.get_node_configuration(node_id)
+        d2 = self.parent.storage.get_affiliation(node_id, requestor.full())
         d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._do_publish, node_id, items, requestor)
@@ -180,7 +178,8 @@ class BackendService(service.MultiService, utility.EventDispatcher):
                     item["id"] = 'random'   # FIXME
 
         if persist_items:
-            d = self.store_items(node_id, items, requestor.full())
+            d = self.parent.storage.store_items(node_id, items,
+                                                requestor.full())
         else:
             d = defer.succeed(None)
 
@@ -191,11 +190,15 @@ class BackendService(service.MultiService, utility.EventDispatcher):
             for item in items:
                 item.children = []
 
-        self.dispatch({ 'items': items, 'node_id': node_id },
-                      '//event/pubsub/notify')
+        self.parent.dispatch({ 'items': items, 'node_id': node_id },
+                             '//event/pubsub/notify')
+
+class NotificationService(service.Service):
+
+    __implements__ = INotificationService,
 
     def get_notification_list(self, node_id, items):
-        d = self.storage.get_subscribers(node_id)
+        d = self.parent.storage.get_subscribers(node_id)
         d.addCallback(self._magic_filter, node_id, items)
         return d
 
@@ -205,11 +208,6 @@ class BackendService(service.MultiService, utility.EventDispatcher):
             list[subscriber] = items
 
         return list
-
-    def store_items(self, node_id, items, publisher):
-        return self.storage.store_items(node_id, items, publisher)
-
-class NotificationService(service.Service):
 
     def register_notifier(self, observerfn, *args, **kwargs):
         self.parent.addObserver('//event/pubsub/notify', observerfn,
