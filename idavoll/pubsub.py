@@ -197,6 +197,14 @@ class ComponentServiceFromSubscriptionService(Service):
         xmlstream.addObserver(PUBSUB_UNSUBSCRIBE, self.onUnsubscribe)
         xmlstream.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
         xmlstream.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet)
+    
+    def getFeatures(self, node):
+        features = []
+
+        if not node:
+            features.append(NS_PUBSUB + "#subscribe")
+
+        return features
 
     def onSubscribe(self, iq):
         self.handler_wrapper(self._onSubscribe, iq)
