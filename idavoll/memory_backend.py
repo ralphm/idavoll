@@ -4,141 +4,179 @@ from twisted.protocols.jabber import jid
 import backend
 
 class Subscription:
-	def __init__(self, state):
-		self.state = state
+    def __init__(self, state):
+        self.state = state
 
 class NodeConfiguration:
-	def __init__(self):
-		self.persist_items = False
-		self.deliver_payloads = False
+    def __init__(self):
+        self.persist_items = False
+        self.deliver_payloads = False
 
 class Node:
-	def __init__(self, id):
-		self.id = id
-		self.configuration = NodeConfiguration()
-		self.subscriptions = {}
-		self.affiliations = {}
-		self.items = {}
+    def __init__(self, id):
+        self.id = id
+        self.configuration = NodeConfiguration()
+        self.subscriptions = {}
+        self.affiliations = {}
+        self.items = {}
 
-class MemoryBackendService(service.Service):
+class BackendService(backend.BackendService):
 
-	__implements__ = backend.IService,
+    def __init__(self):
+        backend.BackendService.__init__(self)
 
-	def __init__(self):
-		self.nodes = {}
+        self.nodes = {}
 
-		node = Node("ralphm/mood/ralphm@ik.nu")
-		node.subscriptions["ralphm@doe.ik.nu"] = Subscription("subscribed")
-		node.subscriptions["notify@ik.nu/mood_monitor"] = Subscription("subscribed")
-		node.affiliations["ralphm@ik.nu"] = "owner"
-		node.affiliations["ralphm@doe.ik.nu"] = "publisher"
-		node.configuration.persist_items = True
-		node.configuration.deliver_payloads = True
-		self.nodes[node.id] = node
+        node = Node("ralphm/mood/ralphm@ik.nu")
+        node.subscriptions["ralphm@doe.ik.nu"] = Subscription("subscribed")
+        node.subscriptions["notify@ik.nu/mood_monitor"] = Subscription("subscribed")
+        node.affiliations["ralphm@ik.nu"] = "owner"
+        node.affiliations["ralphm@doe.ik.nu"] = "publisher"
+        node.configuration.persist_items = True
+        node.configuration.deliver_payloads = True
+        self.nodes[node.id] = node
+    
+    def get_supported_affiliations(self):
+        return ['none', 'owner', 'outcast', 'publisher']
 
-	def do_publish(self, node_id, publisher, items):
-		try:
-			node = self.nodes[node_id]
-			persist_items = node.configuration.persist_items
-			deliver_payloads = node.configuration.deliver_payloads
-		except KeyError:
-			raise backend.NodeNotFound
+    def create_node(self, node_id, requestor):
+        if not node_id:
+            raise backend.NoInstantNodes
 
-		try:
-			if node.affiliations[publisher] not in ['owner', 'publisher']:
-				raise backend.NotAuthorized
-		except KeyError:
-			raise backend.NotAuthorized
+        if node_id in self.nodes:
+            raise backend.NodeExists
+    
+        node = Node(node_id)
+        node.affiliations[requestor.full()] = 'owner'
+        self.nodes[node_id] = node
 
-		if items and not persist_items and not deliver_payloads:
-			raise backend.NoPayloadAllowed
-		elif not items and (persist_items or deliver_payloads):
-			raise backend.PayloadExpected
+        return defer.succeed({'node_id': node.id})
 
-		print "publish by %s to %s" % (publisher, node_id)
+    def publish(self, node_id, items, requestor):
+        try:
+            node = self.nodes[node_id]
+            persist_items = node.configuration.persist_items
+            deliver_payloads = node.configuration.deliver_payloads
+        except KeyError:
+            raise backend.NodeNotFound
 
-		if persist_items or deliver_payloads:
-			for item in items:
-				if item["id"] is None:
-					item["id"] = 'random'	# FIXME
+        try:
+            if node.affiliations[requestor.full()] not in \
+               ['owner', 'publisher']:
+                raise backend.NotAuthorized
+        except KeyError:
+            raise backend.NotAuthorized
 
-		if persist_items:
-			self.storeItems(node_id, publisher, items)
+        if items and not persist_items and not deliver_payloads:
+            raise backend.NoPayloadAllowed
+        elif not items and (persist_items or deliver_payloads):
+            raise backend.PayloadExpected
 
-		if items and not deliver_payloads:
-			for item in items:
-				item.children = []
+        print "publish by %s to %s" % (requestor.full(), node_id)
 
-		recipients = self.get_subscribers(node_id)
-		recipients.addCallback(self.magic_filter, node_id, items)
-		recipients.addCallback(self.pubsub_service.do_notification, node_id)
+        if persist_items or deliver_payloads:
+            for item in items:
+                if item["id"] is None:
+                    item["id"] = 'random'   # FIXME
 
-		return defer.succeed(None)
+        if persist_items:
+            self.store_items(node_id, items, requestor)
 
-	def do_subscribe(self, node_id, subscriber, requestor):
-		# expect subscriber and requestor to be a jid.JID 
-		try:
-			node = self.nodes[node_id]
-		except KeyError:
-			raise backend.NodeNotFound
+        if items and not deliver_payloads:
+            for item in items:
+                item.children = []
 
-		affiliation = node.affiliations.get(requestor.full(), 'none')
+        self.dispatch({ 'items': items, 'node_id': node_id },
+                             '//event/pubsub/notify')
+        return defer.succeed(None)
 
-		if affiliation == 'banned':
-			raise backend.NotAuthorized
+    def get_notification_list(self, node_id, items):
+        
+        try:
+            d = defer.succeed(self.nodes[node_id].subscriptions.keys())
+        except:
+            d = defer.fail()
 
-		print subscriber.full()
-		print subscriber.userhostJID().full()
-		print requestor.full()
+        d.addCallback(self._magic_filter, node_id, items)
 
-		if subscriber.userhostJID() != requestor:
-			raise backend.NotAuthorized
+        return d
 
-		try:
-			subscription = node.subscriptions[subscriber.full()]
-		except KeyError:
-			subscription = Subscription('subscribed')
-			node.subscriptions[subscriber.full()] = subscription
+    def _magic_filter(self, subscribers, node_id, items):
+        list = {}
+        for subscriber in subscribers:
+            list[subscriber] = items
 
-		print node.subscriptions
+        return list
 
-		return defer.succeed({
-				'affiliation': affiliation,
-				'node': node_id,
-				'jid': subscriber,
-				'subscription': subscription.state})
-		
-	def magic_filter(self, subscribers, node_id, items):
-		list = {}
-		for subscriber in subscribers:
-			list[subscriber] = items
+    def subscribe(self, node_id, subscriber, requestor):
+        # expect subscriber and requestor to be a jid.JID 
+        try:
+            node = self.nodes[node_id]
+        except KeyError:
+            raise backend.NodeNotFound
 
-		return list
+        if subscriber.userhostJID() != requestor:
+            raise backend.NotAuthorized
 
-	def get_subscribers(self, node_id):
-		d = defer.Deferred()
-		try:
-			return defer.succeed(self.nodes[node_id].subscriptions.keys())
-		except:
-			return defer.fail()
+        affiliation = node.affiliations.get(subscriber.full(), 'none')
 
-	def storeItems(self, node_id, publisher, items):
-		for item in items:
-			self.nodes[node_id].items[item["id"]] = item
+        if affiliation == 'outcast':
+            raise backend.NotAuthorized
 
-		print self.nodes[node_id].items
+        try:
+            subscription = node.subscriptions[subscriber.full()]
+        except KeyError:
+            subscription = Subscription('subscribed')
+            node.subscriptions[subscriber.full()] = subscription
 
-	def create_node(self, node_id, owner):
-		result = {}
+        print node.subscriptions
 
-		if not node_id:
-			raise backend.NoInstantNodes
+        return defer.succeed({
+                'affiliation': affiliation,
+                'node': node_id,
+                'jid': subscriber,
+                'subscription': subscription.state})
+    
+    def store_items(self, node_id, items, publisher):
+        for item in items:
+            self.nodes[node_id].items[item["id"]] = item
+            print self.nodes[node_id].items
 
-		if node_id in self.nodes:
-			raise backend.NodeExists
-	
-		node = Node(node_id)
-		node.affiliations[owner.full()] = 'owner'
-		self.nodes[node_id] = node
+class NodeCreationService(service.Service):
 
-		return defer.succeed({'node_id': node.id})
+    __implements__ = backend.INodeCreationService,
+
+    def create_node(self, node_id, requestor):
+        return self.parent.create_node(node_id, requestor)
+
+class PublishService(service.Service):
+
+    __implements__ = backend.IPublishService,
+    
+    def publish(self, node_id, items, requestor):
+        return self.parent.publish(node_id, items, requestor)
+    
+class NotificationService(backend.NotificationService):
+
+    __implements__ = backend.INotificationService,
+
+    def get_notification_list(self, node_id, items):
+        return self.parent.get_notification_list(node_id, items)
+
+class SubscriptionService(service.Service):
+
+    __implements__ = backend.ISubscriptionService,
+
+    def subscribe(self, node_id, subscriber, requestor):
+        return self.parent.subscribe(node_id, subscriber, requestor)
+
+    def unsubscribe(self, node_id, subscriber, requestor):
+        raise backend.NotImplemented
+
+class PersistenceService(service.Service):
+
+    __implements__ = backend.IPersistenceService,
+
+    def store_items(self, node_id, items, publisher):
+        return self.parent.store_items(node_id, items, publisher)
+
