@@ -106,12 +106,12 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
+    bsc = b.SubscriptionService()
+    bsc.setServiceParent(bs)
+    component.IService(bsc).setServiceParent(sm)
+
     if config['backend'] == 'memory':
         bsc = b.NodeCreationService()
-        bsc.setServiceParent(bs)
-        component.IService(bsc).setServiceParent(sm)
-
-        bsc = b.SubscriptionService()
         bsc.setServiceParent(bs)
         component.IService(bsc).setServiceParent(sm)
 
