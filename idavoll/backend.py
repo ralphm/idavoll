@@ -141,8 +141,14 @@ class BackendService(service.MultiService, utility.EventDispatcher):
         utility.EventDispatcher.__init__(self)
         self.storage = storage
 
-    def get_supported_affiliations(self):
-        return ['none', 'owner', 'outcast', 'publisher']
+    def supports_publisher_affiliation(self):
+        return True
+
+    def supports_outcast_affiliation(self):
+        return True
+
+    def supports_persistent_items(self):
+        return True
 
 class PublishService(service.Service):
     
@@ -256,3 +262,18 @@ class SubscriptionService(service.Service):
     def _do_unsubscribe(self, result, node_id, subscriber):
         return self.parent.storage.remove_subscription(node_id,
                                                        subscriber.full())
+
+class NodeCreationService(service.Service):
+
+    __implements__ = INodeCreationService,
+
+    def supports_instant_nodes(self):
+        return False
+
+    def create_node(self, node_id, requestor):
+        if not node_id:
+            raise NoInstantNodes
+
+        d = self.parent.storage.create_node(node_id, requestor.full())
+        d.addCallback(lambda _: node_id)
+        return d
