@@ -121,8 +121,7 @@ class IRetractionService(components.Interface):
 class IItemRetrievalService(components.Interface):
     """ A service for retrieving previously published items. """
 
-    def get_items(self, node_id, max_items=None, item_ids=[],
-                  requestor=None):
+    def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
         """ Retrieve items from persistent storage
 
         If C{max_items} is given, return the C{max_items} last published
@@ -318,3 +317,28 @@ class AffiliationsService(service.Service):
                                          'subscription': subscription}
 
         return new_affiliations.values()
+
+class ItemRetrievalService(service.Service):
+
+    __implements__ = IItemRetrievalService
+
+    def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
+        d = self.parent.storage.is_subscribed(node_id, requestor)
+        d.addCallback(self._do_get_items, node_id, max_items, item_ids)
+        return d
+
+    def _do_get_items(self, result, node_id, max_items, item_ids):
+        def q(r):
+            print r
+            return r
+
+        if not result:
+            raise NotAuthorized
+
+        if item_ids:
+            d = self.parent.storage.get_items_by_ids(node_id, item_ids)
+            d.addCallback(q)
+            d.addErrback(q)
+            return d
+        else:
+            return self.parent.storage.get_items(node_id, max_items)

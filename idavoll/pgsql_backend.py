@@ -227,6 +227,68 @@ class Storage:
         d.addCallback(lambda results: [r[0] for r in results])
         return d
 
+    def is_subscribed(self, node_id, subscriber):
+        return self.dbpool.runInteraction(self._is_subscribed, node_id,
+                                                               subscriber)
+
+    def _is_subscribed(self, cursor, node_id, subscriber):
+        self._check_node_exists(cursor, node_id)
+
+        userhost = subscriber.userhost()
+        resource = subscriber.resource or ''
+
+        cursor.execute("""SELECT 1 FROM entities
+                          JOIN subscriptions ON
+                          (entities.id=subscriptions.entity_id)
+                          JOIN nodes ON
+                          (nodes.id=subscriptions.node_id)
+                          WHERE entities.jid=%s AND resource=%s
+                          AND node=%s""",
+                       (userhost.encode('utf8'),
+                       resource.encode('utf8'),
+                       node_id.encode('utf8')))
+
+        return cursor.fetchone() is not None
+
+    def get_items_by_ids(self, node_id, item_ids):
+        return self.dbpool.runInteraction(self._get_items_by_ids, node_id,
+                                                                  item_ids)
+
+    def _get_items_by_ids(self, cursor, node_id, item_ids):
+        self._check_node_exists(cursor, node_id)
+        items = []
+        for item_id in item_ids:
+            cursor.execute("""SELECT data FROM nodes JOIN items ON
+                              (nodes.id=items.node_id)
+                              WHERE node=%s AND item=%s""",
+                           (node_id.encode('utf8'),
+                            item_id.encode('utf8')))
+            result = cursor.fetchone()
+            if result:
+                items.append(result[0])
+        return items
+
+    def get_items(self, node_id, max_items=None):
+        return self.dbpool.runInteraction(self._get_items, node_id, max_items)
+
+    def _get_items(self, cursor, node_id, max_items):
+        self._check_node_exists(cursor, node_id)
+        query = """SELECT data FROM nodes JOIN items ON
+                   (nodes.id=items.node_id)
+                   WHERE node=%s ORDER BY date DESC"""
+        try:
+            if max_items:
+                cursor.execute(query + " LIMIT %s",
+                               (node_id.encode('utf8'),
+                                max_items))
+            else:
+                cursor.execute(query, (node_id.encode('utf8')))
+        except Exception, e:
+            print e
+
+        result = cursor.fetchall()
+        return [r[0] for r in result]
+
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
 
@@ -243,4 +305,7 @@ class SubscriptionService(backend.SubscriptionService):
     pass
 
 class AffiliationsService(backend.AffiliationsService):
+    pass
+
+class ItemRetrievalService(backend.ItemRetrievalService):
     pass
