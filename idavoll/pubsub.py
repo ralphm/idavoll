@@ -24,6 +24,7 @@ PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
+PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
 
 class Error(Exception):
     pubsub_error = None
@@ -225,7 +226,7 @@ class ComponentServiceFromSubscriptionService(Service):
         return d
 
     def return_subscription(self, result):
-        reply = domish.Element((NS_PUBSUB, "pubsub"), NS_PUBSUB)
+        reply = domish.Element((NS_PUBSUB, "pubsub"))
         entity = reply.addElement("entity")
         entity["node"] = result["node"]
         entity["jid"] = result["jid"].full()
@@ -295,10 +296,10 @@ class ComponentServiceFromNodeCreationService(Service):
 
     def return_create_response(self, result, iq):
         if iq.pubsub.create["node"] is None:
-            reply = domish.Element('pubsub', NS_PUBSUB)
+            reply = domish.Element((NS_PUBSUB, 'pubsub'))
             entity = reply.addElement('create')
             entity['node'] = result['node_id']
-            return reply
+            return [reply]
 
     def onConfigureGet(self, iq):
         self.handler_wrapper(self._onConfigureGet, iq)
@@ -313,3 +314,29 @@ class ComponentServiceFromNodeCreationService(Service):
         raise NodeNotConfigurable
 
 components.registerAdapter(ComponentServiceFromNodeCreationService, backend.INodeCreationService, component.IService)
+
+class ComponentServiceFromAffiliationsService(Service):
+
+    def componentConnected(self, xmlstream):
+        xmlstream.addObserver(PUBSUB_AFFILIATIONS, self.onAffiliations)
+
+    def onAffiliations(self, iq):
+        self.handler_wrapper(self._onAffiliations, iq)
+
+    def _onAffiliations(self, iq):
+        d = self.backend.get_affiliations(jid.JID(iq["from"]).userhostJID())
+        d.addCallback(self._return_affiliations_response, iq)
+        return d
+
+    def _return_affiliations_response(self, result, iq):
+        reply = domish.Element((NS_PUBSUB, 'pubsub'))
+        affiliations = reply.addElement('affiliations')
+        for r in result:
+            entity = affiliations.addElement('entity')
+            entity['node'] = r['node']
+            entity['jid'] = r['jid'].full()
+            entity['affiliation'] = r['affiliation'] or 'none'
+            entity['subscription'] = r['subscription'] or 'none'
+        return [reply]
+
+components.registerAdapter(ComponentServiceFromAffiliationsService, backend.IAffiliationsService, component.IService)
