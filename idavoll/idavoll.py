@@ -118,6 +118,11 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
+    if config['backend'] == 'pgsql':
+        bsc = b.AffiliationsService()
+        bsc.setServiceParent(bs)
+        component.IService(bsc).setServiceParent(sm)
+
     s = IdavollService()
     s.setServiceParent(sm)
 
