@@ -74,7 +74,7 @@ class IdavollService(component.Service):
         return iq
 
     def _error(self, results, iq):
-        return xmpp_error.error_from_iq(iq, 'internal-error')
+        return xmpp_error.error_from_iq(iq, 'internal-server-error')
 
     def onDiscoItems(self, iq):
         dl = []
