@@ -27,6 +27,7 @@ PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
 PUBSUB_ITEMS = PUBSUB_GET + '/items'
+PUBSUB_RETRACT = PUBSUB_SET + '/retract'
 
 class Error(Exception):
     pubsub_error = None
@@ -407,3 +408,32 @@ class ComponentServiceFromItemRetrievalService(Service):
         return [reply]
 
 components.registerAdapter(ComponentServiceFromItemRetrievalService, backend.IItemRetrievalService, component.IService)
+
+class ComponentServiceFromRetractionService(Service):
+
+    def componentConnected(self, xmlstream):
+        xmlstream.addObserver(PUBSUB_RETRACT, self.onRetract)
+
+    def onRetract(self, iq):
+        self.handler_wrapper(self._onRetract, iq)
+
+    def _onRetract(self, iq):
+        try:
+            node = iq.pubsub.retract["node"]
+        except KeyError:
+            raise BadRequest
+
+        item_ids = []
+        for child in iq.pubsub.retract.children:
+            if child.__class__ == domish.Element and child.name == 'item':
+                try:
+                    item_ids.append(child["id"])
+                except KeyError:
+                    raise BadRequest
+
+        print item_ids
+
+        return self.backend.retract_item(node, item_ids,
+                                    jid.JID(iq["from"]).userhostJID())
+
+components.registerAdapter(ComponentServiceFromRetractionService, backend.IRetractionService, component.IService)

@@ -346,3 +346,37 @@ class ItemRetrievalService(service.Service):
             return d
         else:
             return self.parent.storage.get_items(node_id, max_items)
+
+class RetractionService(service.Service):
+
+    __implements__ = IRetractionService,
+                                                                                
+    def retract_item(self, node_id, item_ids, requestor):
+        d1 = self.parent.storage.get_node_configuration(node_id)
+        d2 = self.parent.storage.get_affiliation(node_id, requestor)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._do_retract, node_id, item_ids)
+        return d
+                                                                                
+    def _do_retract(self, result, node_id, item_ids):
+        configuration = result[0][1]
+        persist_items = configuration["persist_items"]
+        affiliation = result[1][1]
+                                                                                
+        if affiliation not in ['owner', 'publisher']:
+            raise NotAuthorized
+                                                                                
+        if not persist_items:
+            raise NodeNotPersistent
+                                                                                
+        d = self.parent.storage.remove_items(node_id, item_ids)
+        d.addCallback(self._do_notify_retraction, node_id)
+        return d
+                                                                                
+    def _do_notify_retraction(self, result, node_id):
+        self.parent.dispatch({ 'item_ids': result, 'node_id': node_id },
+                             '//event/pubsub/retract')
+                                                                                
+    def purge_node(self, node_id, requestor):
+        pass

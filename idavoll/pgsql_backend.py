@@ -289,6 +289,24 @@ class Storage:
         result = cursor.fetchall()
         return [r[0] for r in result]
 
+    def remove_items(self, node_id, item_ids):
+        return self.dbpool.runInteraction(self._remove_items, node_id, item_ids)
+
+    def _remove_items(self, cursor, node_id, item_ids):
+        deleted = []
+
+        for item_id in item_ids:
+            cursor.execute("""DELETE FROM items WHERE
+                              node_id=(SELECT id FROM nodes WHERE node=%s) AND
+                              item=%s""",
+                           (node_id.encode('utf-8'),
+                            item_id.encode('utf-8')))
+
+            if cursor.rowcount:
+                deleted.append(item_id)
+
+        return deleted
+
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
 
@@ -308,4 +326,7 @@ class AffiliationsService(backend.AffiliationsService):
     pass
 
 class ItemRetrievalService(backend.ItemRetrievalService):
+    pass
+
+class RetractionService(backend.RetractionService):
     pass
