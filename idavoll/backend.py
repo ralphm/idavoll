@@ -144,6 +144,9 @@ class BackendService(service.MultiService, utility.EventDispatcher):
         service.MultiService.__init__(self)
         utility.EventDispatcher.__init__(self)
 
+    def get_supported_affiliations(self):
+        return ['none', 'owner', 'outcast', 'publisher']
+
 class NotificationService(service.Service):
 
     def register_notifier(self, observerfn, *args, **kwargs):
