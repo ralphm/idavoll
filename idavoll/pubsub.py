@@ -7,6 +7,7 @@ import xmpp_error
 NS_COMPONENT = 'jabber:component:accept'
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 NS_PUBSUB_EVENT = NS_PUBSUB + '#event'
+NS_PUBSUB_ERRORS = NS_PUBSUB + '#errors'
 
 IQ_GET = '/iq[@type="get"]'
 IQ_SET = '/iq[@type="set"]'
@@ -15,6 +16,7 @@ PUBSUB_GET = IQ_GET + PUBSUB_ELEMENT
 PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
+PUBSUB_SUBSCRIBE = PUBSUB_SET + '/subscribe'
 PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 
@@ -32,6 +34,7 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		self.backend = backend
 		self.backend.pubsub_service = self
 		self.addObserver(PUBSUB_PUBLISH, self.onPublish)
+		self.addObserver(PUBSUB_SUBSCRIBE, self.onSubscribe)
 		self.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
 		self.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
 		self.addObserver(PUBSUB_GET, self.notImplemented, -1)
@@ -55,16 +58,18 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		return [
 			"http://jabber.org/protocol/pubsub#outcast-affil",
 			"http://jabber.org/protocol/pubsub#publisher-affil",
-			# We do not really store items yet
-			# "http://jabber.org/protocol/pubsub#persistent-items",
+			"http://jabber.org/protocol/pubsub#persistent-items",
 			]
 
 	def error(self, failure, iq):
-		r = failure.trap(*error_map.keys())
-
-		xmpp_error.error_from_iq(iq, error_map[r], failure.value.msg)
-
-		return iq
+		try: 
+			r = failure.trap(*error_map.keys())
+			xmpp_error.error_from_iq(iq, error_map[r], failure.value.msg)
+			return iq
+		except:
+			xmpp_error.error_from_iq(iq, 'internal-server-error')
+			self.send(iq)
+			raise
 	
 	def success(self, result, iq):
 		iq.swapAttributeValues("to", "from")
@@ -95,10 +100,32 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		d.addCallback(self.send)
 
 	def onOptionsGet(self, iq):
-		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented', 'No subscriber options available'))
+		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
+		iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
+		self.send(iq)
 
 	def onConfigureGet(self, iq):
-		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented', 'Node can not be configured'))
+		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
+		iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
+		self.send(iq)
+
+	def onSubscribe(self, iq):
+		node_id = iq.pubsub.subscribe["node"]
+		subscriber = jid.JID(iq.pubsub.subscribe["jid"])
+		requestor = jid.JID(iq["from"]).userhostJID()
+		d = self.backend.do_subscribe(node_id, subscriber, requestor)
+		d.addCallback(self.return_subscription, iq)
+		d.addErrback(self.error, iq)
+		d.addCallback(self.send)
+
+	def return_subscription(self, result, iq):
+		reply = self.success(result, iq)
+		entity = reply.addElement("entity")
+		entity["node"] = result["node"]
+		entity["jid"] = result["jid"].full()
+		entity["affiliation"] = result["affiliation"]
+		entity["subscription"] = result["subscription"]
+		return iq
 
 	def do_notification(self, list, node):
 
