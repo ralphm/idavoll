@@ -16,6 +16,14 @@ PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
 
+error_map = {
+	backend.NotAuthorized:			'not-authorized',
+	backend.NodeNotFound:			'item-not-found',
+	backend.NoPayloadAllowed:		'bad-request',
+	backend.EmptyPayloadExpected:	'bad-request',
+	backend.PayloadExpected:		'bad-request',
+}
+
 class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 
 	def __init__(self, backend):
@@ -29,13 +37,9 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		xmlstream.addObserver(PUBSUB_GET, self.onPubSub)
 
 	def error(self, failure, iq):
-		r = failure.trap(backend.NotAuthorized, backend.NodeNotFound)
+		r = failure.trap(*error_map.keys())
 
-		if r == backend.NotAuthorized:
-			xmpp_error.error_from_iq(iq, 'not-authorized', failure.value.msg)
-
-		if r == backend.NodeNotFound:
-			xmpp_error.error_from_iq(iq, 'item-not-found', failure.value.msg)
+		xmpp_error.error_from_iq(iq, error_map[r], failure.value.msg)
 
 		return iq
 	
@@ -52,24 +56,31 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 	def onPublish(self, iq):
 		node = iq.pubsub.publish["node"]
 
-		d = self.backend.do_publish(node, jid.JID(iq["from"]).userhost(), iq.pubsub.publish.item)
+		items = []
+		for child in iq.pubsub.publish.children:
+			if child.__class__ == domish.Element and child.name == 'item':
+				items.append(child)
+
+		print items
+
+		d = self.backend.do_publish(node, jid.JID(iq["from"]).userhost(), items)
 		d.addCallback(self.success, iq)
 		d.addErrback(self.error, iq)
 		d.addCallback(self.send)
 
-	def do_notification(self, recipients, node, item):
+	def do_notification(self, list, node):
 
-		for recipient in recipients:
-			self.notify(node, item, recipient)
+		for recipient, items in list.items():
+			self.notify(node, items, recipient)
 
-	def notify(self, node, item, recipient):
+	def notify(self, node, itemlist, recipient):
 		message = domish.Element((NS_COMPONENT, "message"))
 		message["from"] = self.parent.jabberId
 		message["to"] = recipient
 		x = message.addElement((NS_PUBSUB_EVENT, "x"), NS_PUBSUB_EVENT)
 		items = x.addElement("items")
 		items["node"] = node
-		items.children.append(item)
+		items.children.extend(itemlist)
 		self.send(message)
 		
 """
