@@ -96,25 +96,21 @@ class Storage:
 
         return defer.succeed(None)
 
-class BackendService(backend.BackendService):
-    pass
-
-class NodeCreationService(service.Service):
-
-    __implements__ = backend.INodeCreationService,
-
-    def create_node(self, node_id, requestor):
-        if not node_id:
-            raise backend.NoInstantNodes
-
-        if node_id in self.parent.storage.nodes:
+    def create_node(self, node_id, owner):
+        if node_id in self.nodes:
             raise backend.NodeExists
     
         node = Node(node_id)
-        node.affiliations[requestor.full()] = 'owner'
-        self.parent.storage.nodes[node_id] = node
+        node.affiliations[owner] = 'owner'
+        self.nodes[node_id] = node
 
-        return defer.succeed({'node_id': node.id})
+        return defer.succeed(None)
+
+class BackendService(backend.BackendService):
+    pass
+
+class NodeCreationService(backend.NodeCreationService):
+    pass
 
 class PublishService(backend.PublishService):
     pass
