@@ -191,6 +191,29 @@ class Storage:
 
         return None
 
+    def get_affiliations(self, entity):
+        return self.dbpool.runQuery("""SELECT node, affiliation FROM entities
+                                       JOIN affiliations ON
+                                       (affiliations.entity_id=entities.id)
+                                       JOIN nodes ON
+                                       (nodes.id=affiliations.node_id)
+                                       WHERE jid=%s""",
+                                    (entity.full().encode('utf8'),))
+
+    def get_subscriptions(self, entity):
+        d = self.dbpool.runQuery("""SELECT node, jid, resource, subscription
+                                    FROM entities JOIN subscriptions ON
+                                    (subscriptions.entity_id=entities.id)
+                                    JOIN nodes ON
+                                    (nodes.id=subscriptions.node_id)
+                                    WHERE jid=%s""",
+                                 (entity.full().encode('utf8'),))
+        d.addCallback(self._convert_subscription_jids)
+        return d
+
+    def _convert_subscription_jids(self, subscriptions):
+        return [(node, jid.JID('%s/%s' % (subscriber, resource)), subscription)
+                for node, subscriber, resource, subscription in subscriptions]
 
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
@@ -205,4 +228,7 @@ class NotificationService(backend.NotificationService):
     pass
 
 class SubscriptionService(backend.SubscriptionService):
+    pass
+
+class AffiliationsService(backend.AffiliationsService):
     pass
