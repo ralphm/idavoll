@@ -151,8 +151,10 @@ class BackendService(service.MultiService, utility.EventDispatcher):
         return True
 
     def get_node_type(self, node_id):
-        d = self.storage.get_node_type(node_id)
-        return d
+        return self.storage.get_node_type(node_id)
+
+    def get_nodes(self):
+        return self.storage.get_nodes()
 
 class PublishService(service.Service):
     
