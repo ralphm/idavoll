@@ -90,11 +90,11 @@ def makeService(config):
     if config['backend'] == 'pgsql':
         import pgsql_backend as b
         st = b.Storage(user=config['dbuser'], database=config['dbname'])
-        bs = b.BackendService(st)
     elif config['backend'] == 'memory':
         import memory_backend as b
-        bs = b.BackendService()
+        st = b.Storage()
 
+    bs = b.BackendService(st)
 
     component.IService(bs).setServiceParent(sm)
 

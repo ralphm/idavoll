@@ -1,6 +1,7 @@
 from twisted.python import components
 from twisted.application import service
 from twisted.xish import utility
+from twisted.internet import defer
 
 class Error(Exception):
     msg = ''
@@ -140,12 +141,73 @@ class BackendService(service.MultiService, utility.EventDispatcher):
 
     __implements__ = IBackendService,
 
-    def __init__(self):
+    def __init__(self, storage):
         service.MultiService.__init__(self)
         utility.EventDispatcher.__init__(self)
+        self.storage = storage
 
     def get_supported_affiliations(self):
         return ['none', 'owner', 'outcast', 'publisher']
+
+    def publish(self, node_id, items, requestor):
+        d1 = self.storage.get_node_configuration(node_id)
+        d2 = self.storage.get_affiliation(node_id, requestor.full())
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._do_publish, node_id, items, requestor)
+        return d
+
+    def _do_publish(self, result, node_id, items, requestor):
+        print result
+        configuration = result[0][1]
+        persist_items = configuration["persist_items"]
+        deliver_payloads = configuration["deliver_payloads"]
+        affiliation = result[1][1]
+
+        if affiliation not in ['owner', 'publisher']:
+            raise NotAuthorized
+
+        if items and not persist_items and not deliver_payloads:
+            raise NoPayloadAllowed
+        elif not items and (persist_items or deliver_payloads):
+            raise PayloadExpected
+
+        print "publish by %s to %s" % (requestor.full(), node_id)
+
+        if persist_items or deliver_payloads:
+            for item in items:
+                if item["id"] is None:
+                    item["id"] = 'random'   # FIXME
+
+        if persist_items:
+            d = self.store_items(node_id, items, requestor.full())
+        else:
+            d = defer.succeed(None)
+
+        d.addCallback(self._do_notify, node_id, items, deliver_payloads)
+
+    def _do_notify(self, result, node_id, items, deliver_payloads):
+        if items and not deliver_payloads:
+            for item in items:
+                item.children = []
+
+        self.dispatch({ 'items': items, 'node_id': node_id },
+                      '//event/pubsub/notify')
+
+    def get_notification_list(self, node_id, items):
+        d = self.storage.get_subscribers(node_id)
+        d.addCallback(self._magic_filter, node_id, items)
+        return d
+
+    def _magic_filter(self, subscribers, node_id, items):
+        list = {}
+        for subscriber in subscribers:
+            list[subscriber] = items
+
+        return list
+
+    def store_items(self, node_id, items, publisher):
+        return self.storage.store_items(node_id, items, publisher)
 
 class NotificationService(service.Service):
 
