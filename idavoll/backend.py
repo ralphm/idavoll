@@ -31,6 +31,12 @@ class NoPayloadAllowed(BackendException):
 	def __init__(self, msg = 'No payload allowed'):
 		BackendException.__init__(self, msg)
 
+class NoInstantNodes(BackendException):
+	pass
+
+class NodeExists(BackendException):
+	pass
+
 class Subscription:
 	def __init__(self, state):
 		self.state = state
@@ -41,8 +47,8 @@ class NodeConfiguration:
 		self.deliver_payloads = False
 
 class Node:
-	def __init__(self, name):
-		self.name = name
+	def __init__(self, id):
+		self.id = id
 		self.configuration = NodeConfiguration()
 		self.subscriptions = {}
 		self.affiliations = {}
@@ -62,7 +68,7 @@ class MemoryBackendService(service.Service):
 		node.affiliations["ralphm@doe.ik.nu"] = "publisher"
 		node.configuration.persist_items = True
 		node.configuration.deliver_payloads = True
-		self.nodes[node.name] = node
+		self.nodes[node.id] = node
 
 	def do_publish(self, node_id, publisher, items):
 		try:
@@ -89,7 +95,7 @@ class MemoryBackendService(service.Service):
 			if persist_items or deliver_payloads:
 				for item in items:
 					if item["id"] is None:
-						item["id"] = 'random'
+						item["id"] = 'random'	# FIXME
 
 			if persist_items:
 				self.storeItems(node_id, publisher, items)
@@ -167,3 +173,20 @@ class MemoryBackendService(service.Service):
 			self.nodes[node_id].items[item["id"]] = item
 
 		print self.nodes[node_id].items
+
+	def create_node(node_id, owner):
+		result = {}
+
+		try:
+			if not node_id:
+				raise NoInstantNodes
+
+			if node_id in self.nodes:
+				raise NodeExists
+			
+			self.nodes[node_id] = Node(node_id)
+			node.affiliations[owner.full()] = 'owner'
+			return defer.succeed({'node_id': node.id})
+		except:
+			return defer.fail(failure.Failure)
+
