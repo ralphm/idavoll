@@ -304,10 +304,11 @@ class ComponentServiceFromNodeCreationService(Service):
         return d
 
     def return_create_response(self, result, iq):
-        if iq.pubsub.create["node"] is None:
+        node_id = iq.pubsub.create.getAttribute("node")
+        if not node_id or node_id != result:
             reply = domish.Element((NS_PUBSUB, 'pubsub'))
             entity = reply.addElement('create')
-            entity['node'] = result['node_id']
+            entity['node'] = result
             return [reply]
 
     def onConfigureGet(self, iq):
@@ -354,6 +355,14 @@ class ComponentServiceFromItemRetrievalService(Service):
 
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_ITEMS, self.onItems)
+
+    def get_disco_info(self, node):
+        info = []
+
+        if not node:
+            info.append(disco.Feature(NS_PUBSUB + "#retrieve-items"))
+
+        return defer.succeed(info)
 
     def onItems(self, iq):
         self.handler_wrapper(self._onItems, iq)
