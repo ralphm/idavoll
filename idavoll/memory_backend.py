@@ -49,7 +49,7 @@ class Storage:
         except KeyError:
             raise backend.NodeNotFound
         else:
-            return defer.succeed(node.affiliations.get(entity, None))
+            return defer.succeed(node.affiliations.get(entity.full(), None))
 
     def get_subscribers(self, node_id):
         try:
@@ -58,7 +58,7 @@ class Storage:
             raise backend.NodeNotFound
         else:
             subscriptions = self.nodes[node_id].subscriptions
-            subscribers = [s for s in subscriptions
+            subscribers = [jid.JID(s) for s in subscriptions
                              if subscriptions[s].state == 'subscribed']
             return defer.succeed(subscribers)
 
@@ -74,10 +74,10 @@ class Storage:
             raise backend.NodeNotFound
 
         try:
-            subscription = node.subscriptions[subscriber]
+            subscription = node.subscriptions[subscriber.full()]
         except:
             subscription = Subscription(state)
-            node.subscriptions[subscriber] = subscription
+            node.subscriptions[subscriber.full()] = subscription
 
         return defer.succeed({'node': node_id,
                               'jid': subscriber,
@@ -90,7 +90,7 @@ class Storage:
             raise backend.NodeNotFound
 
         try:
-            del node.subscriptions[subscriber]
+            del node.subscriptions[subscriber.full()]
         except KeyError:
             raise backend.NotSubscribed
 
@@ -101,7 +101,7 @@ class Storage:
             raise backend.NodeExists
     
         node = Node(node_id)
-        node.affiliations[owner] = 'owner'
+        node.affiliations[owner.full()] = 'owner'
         self.nodes[node_id] = node
 
         return defer.succeed(None)

@@ -80,7 +80,7 @@ class ISubscriptionService(components.Interface):
         C{node_id}. The C{subscriber} might be different from the C{requestor},
         and if the C{requestor} is not allowed to subscribe this entity an
         exception should be raised.
-    
+
         @return: a deferred that returns the subscription state
         """
 
@@ -156,7 +156,7 @@ class PublishService(service.Service):
 
     def publish(self, node_id, items, requestor):
         d1 = self.parent.storage.get_node_configuration(node_id)
-        d2 = self.parent.storage.get_affiliation(node_id, requestor.full())
+        d2 = self.parent.storage.get_affiliation(node_id, requestor)
         d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._do_publish, node_id, items, requestor)
@@ -185,7 +185,7 @@ class PublishService(service.Service):
 
         if persist_items:
             d = self.parent.storage.store_items(node_id, items,
-                                                requestor.full())
+                                                requestor)
         else:
             d = defer.succeed(None)
 
@@ -212,7 +212,6 @@ class NotificationService(service.Service):
         list = {}
         for subscriber in subscribers:
             list[subscriber] = items
-
         return list
 
     def register_notifier(self, observerfn, *args, **kwargs):
@@ -228,7 +227,7 @@ class SubscriptionService(service.Service):
             raise NotAuthorized
 
         d1 = self.parent.storage.get_node_configuration(node_id)
-        d2 = self.parent.storage.get_affiliation(node_id, subscriber.full())
+        d2 = self.parent.storage.get_affiliation(node_id, subscriber)
         d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._do_subscribe, node_id, subscriber)
@@ -241,14 +240,13 @@ class SubscriptionService(service.Service):
         if affiliation == 'outcast':
             raise NotAuthorized
 
-        d = self.parent.storage.add_subscription(node_id, subscriber.full(),
+        d = self.parent.storage.add_subscription(node_id, subscriber,
                                                  'subscribed')
         d.addCallback(self._return_subscription, affiliation)
         return d
 
     def _return_subscription(self, result, affiliation):
         result['affiliation'] = affiliation
-        result['jid'] = jid.JID(result['jid'])
         return result
 
     def unsubscribe(self, node_id, subscriber, requestor):
@@ -261,7 +259,7 @@ class SubscriptionService(service.Service):
 
     def _do_unsubscribe(self, result, node_id, subscriber):
         return self.parent.storage.remove_subscription(node_id,
-                                                       subscriber.full())
+                                                       subscriber)
 
 class NodeCreationService(service.Service):
 
@@ -274,6 +272,6 @@ class NodeCreationService(service.Service):
         if not node_id:
             raise NoInstantNodes
 
-        d = self.parent.storage.create_node(node_id, requestor.full())
+        d = self.parent.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
         return d

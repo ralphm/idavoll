@@ -38,7 +38,8 @@ class Storage:
                           JOIN nodes ON (node_id=nodes.id)
                           JOIN entities ON (entity_id=entities.id)
                           WHERE node=%s AND jid=%s""",
-                       (node_id.encode('utf8'), entity.encode('utf8')))
+                       (node_id.encode('utf8'),
+                        entity.full().encode('utf8')))
 
         try:
             return cursor.fetchone()[0]
@@ -50,15 +51,19 @@ class Storage:
                                           entity)
 
     def get_subscribers(self, node_id):
-        self._check_node_exists(cursor, node_id)
-        d = self.dbpool.runQuery("""SELECT jid, resource FROM subscriptions
-                                       JOIN nodes ON (node_id=nodes.id)
-                                       JOIN entities ON (entity_id=entities.id)
-                                       WHERE node=%s AND
-                                             subscription='subscribed'""",
-                                    (node_id.encode('utf8'),))
+        d = self.dbpool.runInteraction(self._get_subscribers, node_id)
         d.addCallback(self._convert_to_jids)
         return d
+
+    def _get_subscribers(self, cursor,node_id):
+        self._check_node_exists(cursor, node_id)
+        cursor.execute("""SELECT jid, resource FROM subscriptions
+                          JOIN nodes ON (node_id=nodes.id)
+                          JOIN entities ON (entity_id=entities.id)
+                          WHERE node=%s AND
+                          subscription='subscribed'""",
+                       (node_id.encode('utf8'),))
+        return cursor.fetchall()
 
     def _convert_to_jids(self, list):
         return [jid.JID("%s/%s" % (l[0], l[1])).full() for l in list]
@@ -78,7 +83,7 @@ class Storage:
                           FROM nodes
                           WHERE nodes.id = items.node_id AND
                                 nodes.node = %s and items.item=%s""",
-                       (publisher.encode('utf8'),
+                       (publisher.full().encode('utf8'),
                         data.encode('utf8'),
                         node_id.encode('utf8'),
                         item["id"].encode('utf8')))
@@ -88,7 +93,7 @@ class Storage:
         cursor.execute("""INSERT INTO items (node_id, item, publisher, data)
                           SELECT id, %s, %s, %s FROM nodes WHERE node=%s""",
                        (item["id"].encode('utf8'),
-                        publisher.encode('utf8'),
+                        publisher.full().encode('utf8'),
                         data.encode('utf8'),
                         node_id.encode('utf8')))
 
@@ -98,7 +103,6 @@ class Storage:
 
     def _add_subscription(self, cursor, node_id, subscriber, state):
         self._check_node_exists(cursor, node_id)
-        subscriber = jid.JID(subscriber)
         userhost = subscriber.userhost()
         resource = subscriber.resource or ''
 
@@ -131,7 +135,7 @@ class Storage:
             state = cursor.fetchone()[0]
 
         return {'node': node_id,
-                'jid': subscriber.full(),
+                'jid': subscriber,
                 'subscription': state}
 
     def remove_subscription(self, node_id, subscriber):
@@ -140,7 +144,6 @@ class Storage:
 
     def _remove_subscription(self, cursor, node_id, subscriber):
         self._check_node_exists(cursor, node_id)
-        subscriber = jid.JID(subscriber)
         userhost = subscriber.userhost()
         resource = subscriber.resource or ''
 
@@ -168,11 +171,11 @@ class Storage:
             raise backend.NodeExists
        
         cursor.execute("""SELECT 1 from entities where jid=%s""",
-                       (owner.encode('utf8')))
+                       (owner.full().encode('utf8')))
 
         if not cursor.fetchone():
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                           (owner.encode('utf8')))
+                           (owner.full().encode('utf8')))
 
         try:
             cursor.execute("""INSERT INTO affiliations
@@ -182,7 +185,7 @@ class Storage:
                               CROSS JOIN
                               (SELECT id FROM entities WHERE jid=%s) AS e""",
                            (node_id.encode('utf8'),
-                            owner.encode('utf8')))
+                            owner.full().encode('utf8')))
         except Exception, e:
             print e
 
