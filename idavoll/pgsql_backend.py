@@ -222,6 +222,11 @@ class Storage:
         self._check_node_exists(cursor, node_id)
         return 'leaf'
 
+    def get_nodes(self):
+        d = self.dbpool.runQuery("""SELECT node from nodes""")
+        d.addCallback(lambda results: [r[0] for r in results])
+        return d
+
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
 
