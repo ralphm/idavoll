@@ -485,6 +485,14 @@ class ComponentServiceFromRetractionService(Service):
         xmlstream.addObserver(PUBSUB_RETRACT, self.onRetract)
         xmlstream.addObserver(PUBSUB_PURGE, self.onPurge)
 
+    def get_disco_info(self, node):
+        info = []
+
+        if not node:
+            info.append(disco.Feature(NS_PUBSUB + "#delete-any"))
+
+        return defer.succeed(info)
+
     def onRetract(self, iq):
         self.handler_wrapper(self._onRetract, iq)
 
