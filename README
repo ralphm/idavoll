@@ -43,6 +43,10 @@ Requirements
 
     http://mag.ik.nu/~ralphm/tmp/jid.py.patch
 
+- Add the following file in the twisted/protocols/jabber directory:
+
+    http://mag.ik.nu/~ralphm/tmp/xmpp_stringprep.py
+
 - A jabber server like jabberd 1.4.x
 
 For the PostgreSQL backend, the following is also required:
