@@ -18,13 +18,17 @@ PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
 PUBSUB_SUBSCRIBE = PUBSUB_SET + '/subscribe'
 PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
+PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
+PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 
 error_map = {
 	backend.NotAuthorized:			'not-authorized',
 	backend.NodeNotFound:			'item-not-found',
 	backend.NoPayloadAllowed:		'bad-request',
 	backend.PayloadExpected:		'bad-request',
+	backend.NoInstantNodes:			'not-acceptable',
+	backend.NodeExists:				'conflict',
 }
 
 class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
@@ -34,7 +38,14 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		self.backend = backend
 		self.backend.pubsub_service = self
 		self.addObserver(PUBSUB_PUBLISH, self.onPublish)
-		self.addObserver(PUBSUB_SUBSCRIBE, self.onSubscribe)
+
+		# make sure subscribe and create are handled before resp. options and
+		# configure
+		self.addObserver(PUBSUB_SUBSCRIBE, self.onSubscribe, 0)
+		self.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet, 1)
+		self.addObserver(PUBSUB_CREATE, self.onSubscribe, 0)
+		self.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet, 1)
+
 		self.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
 		self.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
 		self.addObserver(PUBSUB_GET, self.notImplemented, -1)
@@ -104,12 +115,36 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
 		self.send(iq)
 
+	def onOptionsSet(self, iq):
+		if iq.pubsub.subscribe:
+			# this should be handled by the subscribe handler
+			return
+
+		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
+		iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
+		self.send(iq)
+
 	def onConfigureGet(self, iq):
 		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
 		iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
 		self.send(iq)
 
+	def onConfigureSet(self, iq):
+		if iq.pubsub.create:
+			# this should be handled by the create handler
+			return
+
+		xmpp_error.error_from_iq(iq, 'feature-not-implemented')
+		iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
+		self.send(iq)
+
 	def onSubscribe(self, iq):
+		if iq.pubsub.options:
+			xmpp_error.error_from_iq(iq, 'not-acceptable')
+			iq.error.addElement((NS_PUBSUB_ERRORS, 'subscription-options-unavailable'), NS_PUBSUB_ERRORS)
+			self.send(iq)
+			return
+
 		node_id = iq.pubsub.subscribe["node"]
 		subscriber = jid.JID(iq.pubsub.subscribe["jid"])
 		requestor = jid.JID(iq["from"]).userhostJID()
@@ -143,21 +178,31 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		items.children.extend(itemlist)
 		self.send(message)
 		
-"""
-	def onCreateSet(self, iq):
+	def onCreate(self, iq):
+		if iq.pubsub.options:
+			xmpp_error.error_from_iq(iq, 'not-acceptable')
+			iq.error.addElement((NS_PUBSUB_ERRORS, 'node-not-configurable'), NS_PUBSUB_ERRORS)
+			self.send(iq)
+			return
+
 		node = iq.pubsub.create["node"]
-		owner = jid.JID(iq["from"]).userhost()
+		owner = jid.JID(iq["from"]).userhostJID()
 
 		try:
-			node = self.backend.create_node(node, owner)
-
-			if iq.pubsub.create["node"] == None:
-				# also show node name
+			d = self.backend.create_node(node, owner)
+			d.addCallback(self.return_create_response, iq)
+			d.addCallback(self.succeed, iq)
+			d.addErrback(self.error, iq)
+			d.addCallback(self.send)
 		except:
 			pass
 
-		iq.handled = True
-"""
+	def return_create_response(self, result, iq):
+		if iq.pubsub.create["node"] is None:
+			reply = domish.Element('pubsub', NS_PUBSUB)
+			entity = reply.addElement('create')
+			entity['node'] = result['node_id']
+			return reply
 
 components.registerAdapter(ComponentServiceFromBackend, backend.IBackendService, component.IService)
 
