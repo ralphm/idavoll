@@ -27,7 +27,10 @@ class NodeExists(Error):
     pass
 
 class NotImplemented(Error):
-    msg = 'Oops!'
+    pass
+
+class NotSubscribed(Error):
+    pass
 
 class IBackendService(components.Interface):
     """ Interface to a backend service of a pubsub service. """
