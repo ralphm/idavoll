@@ -1,6 +1,7 @@
 from twisted.application import service
 from twisted.python import components, failure
 from twisted.internet import defer, reactor
+from twisted.protocols.jabber import jid
 
 class IBackendService(components.Interface):
 	""" Interface to a backend service of a pubsub service """
@@ -30,41 +31,49 @@ class NoPayloadAllowed(BackendException):
 	def __init__(self, msg = 'No payload allowed'):
 		BackendException.__init__(self, msg)
 
+class Subscription:
+	def __init__(self, state):
+		self.state = state
+
+class NodeConfiguration:
+	def __init__(self):
+		self.persist_items = False
+		self.deliver_payloads = False
+
+class Node:
+	def __init__(self, name):
+		self.name = name
+		self.configuration = NodeConfiguration()
+		self.subscriptions = {}
+		self.affiliations = {}
+		self.items = {}
+
 class MemoryBackendService(service.Service):
 
 	__implements__ = IBackendService,
 
 	def __init__(self):
-		self.nodes = {
-			"ralphm/mood/ralphm@ik.nu": {
-				"persist_items": True,
-				"deliver_payloads": True,
-			}
-		}
-		self.subscribers = {
-			"ralphm/mood/ralphm@ik.nu": [
-				"notify@ik.nu/mood_monitor"
-			]
-		}
-		self.affiliations = {
-			"ralphm/mood/ralphm@ik.nu": {
-				"ralphm@ik.nu": "owner",
-				"ralphm@doe.ik.nu": "publisher"
-			}
-		}
+		self.nodes = {}
 
-	def do_publish(self, node, publisher, items):
+		node = Node("ralphm/mood/ralphm@ik.nu")
+		node.subscriptions["ralphm@doe.ik.nu"] = Subscription("subscribed")
+		node.affiliations["ralphm@ik.nu"] = "owner"
+		node.affiliations["ralphm@doe.ik.nu"] = "publisher"
+		node.configuration.persist_items = True
+		node.configuration.deliver_payloads = True
+		self.nodes[node.name] = node
+
+	def do_publish(self, node_id, publisher, items):
 		try:
 			try:
-				config = self.nodes[node]
-				persist_items = config["persist_items"]
-				deliver_payloads = config["deliver_payloads"]
+				node = self.nodes[node_id]
+				persist_items = node.configuration.persist_items
+				deliver_payloads = node.configuration.deliver_payloads
 			except KeyError:
 				raise NodeNotFound
 
 			try:
-				affiliation = self.affiliations[node][publisher]
-				if affiliation not in ['owner', 'publisher']:
+				if node.affiliations[publisher] not in ['owner', 'publisher']:
 					raise NotAuthorized
 			except KeyError:
 				raise NotAuthorized()
@@ -78,7 +87,7 @@ class MemoryBackendService(service.Service):
 			elif not items and (persist_items or deliver_payloads):
 				raise PayloadExpected
 
-			print "publish by %s to %s" % (publisher, node)
+			print "publish by %s to %s" % (publisher, node_id)
 
 			if persist_items or deliver_payloads:
 				for item in items:
@@ -86,32 +95,70 @@ class MemoryBackendService(service.Service):
 						item["id"] = 'random'
 
 			if persist_items:
-				self.storeItems(node, publisher, items)
+				self.storeItems(node_id, publisher, items)
 
 			if items and not deliver_payloads:
 				for item in items:
 					item.children = []
 
-			recipients = self.get_subscribers(node)
-			recipients.addCallback(self.magic_filter, node, items)
-			recipients.addCallback(self.pubsub_service.do_notification, node)
+			recipients = self.get_subscribers(node_id)
+			recipients.addCallback(self.magic_filter, node_id, items)
+			recipients.addCallback(self.pubsub_service.do_notification, node_id)
 
 			return defer.succeed(None)
 		except:
 			f = failure.Failure()
 			return defer.fail(f)
 
-	def magic_filter(self, subscribers, node, items):
+	def do_subscribe(self, node_id, subscriber, requestor):
+		# expect subscriber and requestor to be a jid.JID 
+		try:
+			try:
+				node = self.nodes[node_id]
+			except KeyError:
+				raise NodeNotFound
+
+			affiliation = node.affiliations.get(requestor.full(), 'none')
+
+			if affiliation == 'banned':
+				raise NotAuthorized
+
+			print subscriber.full()
+			print subscriber.userhostJID().full()
+			print requestor.full()
+
+			if subscriber.userhostJID() != requestor:
+				raise NotAuthorized
+
+			try:
+				subscription = node.subscriptions[subscriber.full()]
+			except KeyError:
+				subscription = Subscription('subscribed')
+				node.subscriptions[subscriber.full()] = subscription
+
+			print node.subscriptions
+
+			return defer.succeed({
+					'affiliation': affiliation,
+					'node': node_id,
+					'jid': subscriber,
+					'subscription': subscription.state})
+		except:
+			f = failure.Failure()
+			return defer.fail(f)
+
+		
+	def magic_filter(self, subscribers, node_id, items):
 		list = {}
 		for subscriber in subscribers:
 			list[subscriber] = items
 
 		return list
 
-	def get_subscribers(self, node):
+	def get_subscribers(self, node_id):
 		d = defer.Deferred()
 		try:
-			result = self.subscribers[node]
+			result = self.nodes[node_id].subscriptions.keys()
 		except:
 			f = failure.Failure()
 			reactor.callLater(0, d.errback, f)
@@ -120,7 +167,8 @@ class MemoryBackendService(service.Service):
 
 		return d
 
-	def storeItems(self, node, publisher, items):
+	def storeItems(self, node_id, publisher, items):
 		for item in items:
-			print "Storing item %s" % item.toXml()
+			self.nodes[node_id].items[item["id"]] = item
 
+		print self.nodes[node_id].items
