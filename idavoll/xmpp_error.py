@@ -4,7 +4,9 @@ conditions = {
 	'bad-request':				{'code': '400', 'type': 'modify'},
 	'not-authorized':			{'code': '401', 'type': 'cancel'},
 	'item-not-found':			{'code': '404', 'type': 'cancel'},
+	'internal-server-error':	{'code': '500', 'type': 'wait'},
 	'feature-not-implemented':	{'code': '501', 'type': 'cancel'},
+	'service-unavailable':		{'code': '503', 'type': 'cancel'},
 }
 
 def error_from_iq(iq, condition, text = '', type = None):
