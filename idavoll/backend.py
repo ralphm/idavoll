@@ -171,6 +171,18 @@ class BackendService(service.MultiService, utility.EventDispatcher):
 
     __implements__ = IBackendService,
 
+    options = {"pubsub#persist_items":
+                  {"type": "boolean",
+                   "label": "Persist items to storage"},
+               "pubsub#deliver_payloads":
+                  {"type": "boolean",
+                   "label": "Deliver payloads with event notifications"},
+              }
+
+    default_config = {"pubsub#persist_items": True,
+                      "pubsub#deliver_payloads": True,
+                     }
+
     def __init__(self, storage):
         service.MultiService.__init__(self)
         utility.EventDispatcher.__init__(self)
@@ -190,6 +202,23 @@ class BackendService(service.MultiService, utility.EventDispatcher):
 
     def get_nodes(self):
         return self.storage.get_nodes()
+
+    def get_node_meta_data(self, node_id):
+        d = self.storage.get_node_configuration(node_id)
+
+        d.addCallback(self._make_meta_data)
+        return d
+
+    def _make_meta_data(self, meta_data):
+        options = []
+        for key, value in meta_data.iteritems():
+            if self.options.has_key(key):
+                option = {"var": key}
+                option.update(self.options[key])
+                option["value"] = value
+                options.append(option)
+
+        return options
 
 class PublishService(service.Service):
     
@@ -305,14 +334,6 @@ class NodeCreationService(service.Service):
 
     __implements__ = INodeCreationService,
 
-    options = {"pubsub#persist_items":
-                  {"type": "boolean",
-                   "label": "Persist items to storage"},
-               "pubsub#deliver_payloads":
-                  { "type": "boolean",
-                   "label": "Deliver payloads with event notifications"}
-              }
-
     def supports_instant_nodes(self):
         return True
 
@@ -329,28 +350,26 @@ class NodeCreationService(service.Service):
         if node_id:
             d = self.parent.storage.get_node_configuration(node_id)
         else:
-            d = defer.succeed({"pubsub#persist_items": True,
-                               "pubsub#deliver_payloads": True})
+            # XXX: this is disabled in pubsub.py
+            d = defer.succeed(self.parent.default_config)
 
         d.addCallback(self._make_config)
         return d
 
     def _make_config(self, config):
         options = []
-        for key, value in config.iteritems():
+        for key, value in self.parent.options.iteritems():
             option = {"var": key}
-            option.update(self.options[key])
-            if option["type"] == "boolean":
-                option["value"] = str(int(bool(value)))
-            else:
-                option["value"] = str(value)
+            option.update(value)
+            if config.has_key(key):
+                option["value"] = config[key]
             options.append(option)
 
         return options
 
     def set_node_configuration(self, node_id, options, requestor):
         for key in options.iterkeys():
-            if not self.options.has_key(key):
+            if not self.parent.options.has_key(key):
                 raise InvalidConfigurationOption
 
         d = self.parent.storage.get_affiliation(node_id, requestor)

@@ -69,11 +69,18 @@ class IdavollService(component.Service):
         else:
             iq.swapAttributeValues("to", "from")
             iq["type"] = "result"
-            iq.query.children = info
+            for item in info:
+                #domish.Element.addChild should probably do this for all
+                # subclasses of Element
+                item.parent = iq.query
+
+                iq.query.addChild(item)
 
         return iq
 
-    def _error(self, results, iq):
+    def _error(self, result, iq):
+        print "Got error on index %d:" % result.value[1]
+        result.value[0].printBriefTraceback()
         return xmpp_error.error_from_iq(iq, 'internal-server-error')
 
     def onDiscoItems(self, iq):

@@ -6,13 +6,13 @@ from twisted.internet import defer
 import backend
 import xmpp_error
 import disco
+import data_form
 
 NS_COMPONENT = 'jabber:component:accept'
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 NS_PUBSUB_EVENT = NS_PUBSUB + '#event'
 NS_PUBSUB_ERRORS = NS_PUBSUB + '#errors'
 NS_PUBSUB_OWNER = NS_PUBSUB + "#owner"
-NS_X_DATA = 'jabber:x:data'
 
 IQ_GET = '/iq[@type="get"]'
 IQ_SET = '/iq[@type="set"]'
@@ -140,9 +140,26 @@ class ComponentServiceFromService(Service):
             return defer.succeed(info)
         else:
             d = self.backend.get_node_type(node)
-            d.addCallback(lambda x: [disco.Identity('pubsub', x)])
+            d.addCallback(self._add_identity, [], node)
             d.addErrback(lambda _: [])
             return d
+
+    def _add_identity(self, node_type, result_list, node):
+        result_list.append(disco.Identity('pubsub', node_type))
+        d = self.backend.get_node_meta_data(node)
+        d.addCallback(self._add_meta_data, node_type, result_list)
+        return d
+
+    def _add_meta_data(self, meta_data, node_type, result_list):
+        form = data_form.Form(type="result", form_type=NS_PUBSUB + "#meta-data")
+        for meta_datum in meta_data:
+            form.add_field_single(**meta_datum)
+        form.add_field_single("text-single",
+                              "pubsub#node_type",
+                              "The type of node (collection or leaf)",
+                              node_type)
+        result_list.append(form)
+        return result_list
 
     def get_disco_items(self, node):
         if node or self.hide_nodes:
@@ -335,19 +352,13 @@ class ComponentServiceFromNodeCreationService(Service):
         configure = reply.addElement("configure")
         if node_id:
             configure["node"] = node_id
-        form = configure.addElement((NS_X_DATA, "x"))
-        form["type"] = "form"
-        field = form.addElement("field")
-        field["var"] = "FORM_TYPE"
-        field["type"] = "hidden"
-        field.addElement("value", content=NS_PUBSUB + "#node_config")
+        form = data_form.Form(type="form",
+                              form_type=NS_PUBSUB + "#node_config")
 
         for option in options:
-            field = form.addElement("field")
-            field["var"] = option["var"]
-            field["type"] = option["type"]
-            field["label"] = option["label"]
-            field.addElement("value", content=option["value"])
+            form.add_field_single(**option)
+
+        configure.addChild(form)
 
         return [reply]
 
