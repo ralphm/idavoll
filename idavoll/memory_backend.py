@@ -24,15 +24,6 @@ class Storage:
     def __init__(self):
         self.nodes = {}
 
-        node = Node("ralphm/mood/ralphm@ik.nu")
-        node.subscriptions["ralphm@doe.ik.nu"] = Subscription("subscribed")
-        node.subscriptions["notify@ik.nu/mood_monitor"] = Subscription("subscribed")
-        node.affiliations["ralphm@ik.nu"] = "owner"
-        node.affiliations["ralphm@doe.ik.nu"] = "publisher"
-        node.configuration.persist_items = True
-        node.configuration.deliver_payloads = True
-        self.nodes[node.id] = node
-
     def get_node_configuration(self, node_id):
         try:
             node = self.nodes[node_id]
