@@ -8,8 +8,15 @@ class Options(usage.Options):
 		('jid', None, 'pubsub'),
 		('secret', None, None),
 		('rhost', None, '127.0.0.1'),
-		('rport', None, '6000')
+		('rport', None, '6000'),
+		('backend', None, 'memory'),
+		('dbuser', None, ''),
+		('dbname', None, 'pubsub'),
 	]
+	
+	def postOptions(self):
+		if self['backend'] not in ['pgsql', 'memory']:
+			raise usage.UsageError, "Unknown backend!"
 
 def makeService(config):
 	return idavoll.makeService(config)

@@ -2,7 +2,6 @@ from twisted.protocols.jabber import component
 from twisted.application import service
 from twisted.python import components
 import backend
-import memory_backend
 import pubsub
 import xmpp_error
 
@@ -88,8 +87,14 @@ def makeService(config):
     sm = component.buildServiceManager(config["jid"], config["secret"],
             ("tcp:%s:%s" % (config["rhost"], config["rport"])))
 
-    b = memory_backend
-    bs = b.BackendService()
+    if config['backend'] == 'pgsql':
+        import pgsql_backend as b
+        st = b.Storage(user=config['dbuser'], database=config['dbname'])
+        bs = b.BackendService(st)
+    elif config['backend'] == 'memory':
+        import memory_backend as b
+        bs = b.BackendService()
+
 
     component.IService(bs).setServiceParent(sm)
 
@@ -101,13 +106,14 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
-    bsc = b.NodeCreationService()
-    bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    if config['backend'] == 'memory':
+        bsc = b.NodeCreationService()
+        bsc.setServiceParent(bs)
+        component.IService(bsc).setServiceParent(sm)
 
-    bsc = b.SubscriptionService()
-    bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+        bsc = b.SubscriptionService()
+        bsc.setServiceParent(bs)
+        component.IService(bsc).setServiceParent(sm)
 
     s = IdavollService()
     s.setServiceParent(sm)
