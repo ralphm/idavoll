@@ -26,6 +26,7 @@ PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
+PUBSUB_ITEMS = PUBSUB_GET + '/items'
 
 class Error(Exception):
     pubsub_error = None
@@ -77,7 +78,11 @@ class Service(component.Service):
     def error(self, failure, iq):
         try: 
             e = failure.trap(Error, *error_map.keys())
-
+        except:
+            failure.printBriefTraceback()
+            xmpp_error.error_from_iq(iq, 'internal-server-error')
+            return iq
+        else:
             if e == Error:
                 stanza_error = failure.value.stanza_error
                 pubsub_error = failure.value.pubsub_error
@@ -90,10 +95,6 @@ class Service(component.Service):
             if pubsub_error:
                 iq.error.addElement((NS_PUBSUB_ERRORS, pubsub_error))
             return iq
-        except:
-            xmpp_error.error_from_iq(iq, 'internal-server-error')
-            self.send(iq)
-            raise
     
     def success(self, result, iq):
         iq.swapAttributeValues("to", "from")
@@ -348,3 +349,52 @@ class ComponentServiceFromAffiliationsService(Service):
         return [reply]
 
 components.registerAdapter(ComponentServiceFromAffiliationsService, backend.IAffiliationsService, component.IService)
+
+class ComponentServiceFromItemRetrievalService(Service):
+
+    def componentConnected(self, xmlstream):
+        xmlstream.addObserver(PUBSUB_ITEMS, self.onItems)
+
+    def onItems(self, iq):
+        self.handler_wrapper(self._onItems, iq)
+
+    def _onItems(self, iq):
+        try:
+            node_id = iq.pubsub.items["node"]
+        except KeyError:
+            raise BadRequest
+
+        max_items = iq.pubsub.items.getAttribute('max_items')
+
+        if max_items:
+            try:
+                max_items = int(max_items)
+            except ValueError:
+                raise BadRequest
+
+        item_ids = []
+        for child in iq.pubsub.items.children:
+            if child.name == 'item' and child.uri == NS_PUBSUB:
+                try:
+                    item_ids.append(child["id"])
+                except KeyError:
+                    raise BadRequest
+       
+        d = self.backend.get_items(node_id, jid.JID(iq["from"]), max_items,
+                                   item_ids)
+        d.addCallback(self._return_items_response, node_id)
+        return d
+
+    def _return_items_response(self, result, node_id):
+        reply = domish.Element((NS_PUBSUB, 'pubsub'))
+        items = reply.addElement('items')
+        items["node"] = node_id
+        try:
+            for r in result:
+                items.addRawXml(r)
+        except Exception, e:
+            print e
+
+        return [reply]
+
+components.registerAdapter(ComponentServiceFromItemRetrievalService, backend.IItemRetrievalService, component.IService)
