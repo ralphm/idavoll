@@ -293,6 +293,8 @@ class Storage:
         return self.dbpool.runInteraction(self._remove_items, node_id, item_ids)
 
     def _remove_items(self, cursor, node_id, item_ids):
+        self._check_node_exists(cursor, node_id)
+        
         deleted = []
 
         for item_id in item_ids:
@@ -306,6 +308,25 @@ class Storage:
                 deleted.append(item_id)
 
         return deleted
+
+    def purge_node(self, node_id):
+        return self.dbpool.runInteraction(self._purge_node, node_id)
+
+    def _purge_node(self, cursor, node_id):
+        self._check_node_exists(cursor, node_id)
+
+        cursor.execute("""DELETE FROM items WHERE
+                          node_id=(SELECT id FROM nodes WHERE node=%s)""",
+                       (node_id.encode('utf-8'),))
+
+    def delete_node(self, node_id):
+        return self.dbpool.runInteraction(self._delete_node, node_id)
+
+    def _delete_node(self, cursor, node_id):
+        self._check_node_exists(cursor, node_id)
+
+        cursor.execute("""DELETE FROM nodes WHERE node=%s""",
+                       (node_id.encode('utf-8'),))
 
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
@@ -329,4 +350,7 @@ class ItemRetrievalService(backend.ItemRetrievalService):
     pass
 
 class RetractionService(backend.RetractionService):
+    pass
+
+class NodeDeletionService(backend.NodeDeletionService):
     pass

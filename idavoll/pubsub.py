@@ -28,6 +28,8 @@ PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
 PUBSUB_ITEMS = PUBSUB_GET + '/items'
 PUBSUB_RETRACT = PUBSUB_SET + '/retract'
+PUBSUB_PURGE = PUBSUB_SET + '/purge'
+PUBSUB_DELETE = PUBSUB_SET + '/delete'
 
 class Error(Exception):
     pubsub_error = None
@@ -413,6 +415,7 @@ class ComponentServiceFromRetractionService(Service):
 
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_RETRACT, self.onRetract)
+        xmlstream.addObserver(PUBSUB_PURGE, self.onPurge)
 
     def onRetract(self, iq):
         self.handler_wrapper(self._onRetract, iq)
@@ -436,4 +439,59 @@ class ComponentServiceFromRetractionService(Service):
         return self.backend.retract_item(node, item_ids,
                                     jid.JID(iq["from"]).userhostJID())
 
+    def onPurge(self, iq):
+        self.handler_wrapper(self._onPurge, iq)
+
+    def _onPurge(self, iq):
+        try:
+            node = iq.pubsub.purge["node"]
+        except KeyError:
+            raise BadRequest
+
+        return self.backend.purge_node(node, jid.JID(iq["from"]).userhostJID())
+
 components.registerAdapter(ComponentServiceFromRetractionService, backend.IRetractionService, component.IService)
+
+class ComponentServiceFromNodeDeletionService(Service):
+
+    def __init__(self, backend):
+        Service.__init__(self, backend)
+        self.subscribers = []
+
+    def componentConnected(self, xmlstream):
+        self.backend.register_pre_delete(self._pre_delete)
+        xmlstream.addObserver(PUBSUB_DELETE, self.onDelete)
+
+    def _pre_delete(self, node_id):
+        d = self.backend.get_subscribers(node_id)
+        d.addCallback(self._return_deferreds, node_id)
+        return d
+
+    def _return_deferreds(self, subscribers, node_id):
+        d = defer.Deferred()
+        d.addCallback(self._notify, subscribers, node_id)
+        return [d]
+
+    def _notify(self, result, subscribers, node_id):
+        message = domish.Element((NS_COMPONENT, "message"))
+        message["from"] = self.parent.jabberId
+        event = message.addElement((NS_PUBSUB_EVENT, "event"))
+        event.addElement("delete")["node"] = node_id
+
+        for subscriber in subscribers:
+            message["to"] = subscriber
+            print message.toXml()
+            self.send(message)
+
+    def onDelete(self, iq):
+        self.handler_wrapper(self._onDelete, iq)
+
+    def _onDelete(self, iq):
+        try:
+            node = iq.pubsub.delete["node"]
+        except KeyError:
+            raise BadRequest
+
+        return self.backend.delete_node(node, jid.JID(iq["from"]).userhostJID())
+
+components.registerAdapter(ComponentServiceFromNodeDeletionService, backend.INodeDeletionService, component.IService)

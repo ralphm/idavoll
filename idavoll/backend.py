@@ -54,6 +54,40 @@ class INodeCreationService(components.Interface):
         @return: a deferred that fires when the node has been created.
         """
 
+class INodeDeletionService(components.Interface):
+    """ A service for deleting nodes. """
+
+    def register_pre_delete(self, pre_delete_fn):
+        """ Register a callback that is called just before a node deletion.
+        
+        The function C{pre_deleted_fn} is added to a list of functions
+        to be called just before deletion of a node. The callback
+        C{pre_delete_fn} is called with the C{node_id} that is about to be
+        deleted and should return a deferred that returns a list of deferreds
+        that are to be fired after deletion. The backend collects the lists
+        from all these callbacks before actually deleting the node in question.
+        After deletion all collected deferreds are fired to do post-processing.
+
+        The idea is that you want to be able to collect data from the
+        node before deleting it, for example to get a list of subscribers
+        that have to be notified after the node has been deleted. To do this,
+        C{pre_delete_fn} fetches the subscriber list and passes this
+        list to a callback attached to a deferred that it sets up. This
+        deferred is returned in the list of deferreds.
+        """
+
+    def get_subscribers(self, node_id):
+        """ Get node subscriber list.
+        
+        @return: a deferred that fires with the list of subscribers.
+        """
+
+    def delete_node(self, node_id, requestor):
+        """ Delete a node.
+        
+        @return: a deferred that fires when the node has been deleted.
+        """
+
 class IPublishService(components.Interface):
     """ A service for publishing items to a node. """
 
@@ -379,4 +413,75 @@ class RetractionService(service.Service):
                              '//event/pubsub/retract')
                                                                                 
     def purge_node(self, node_id, requestor):
-        pass
+        d1 = self.parent.storage.get_node_configuration(node_id)
+        d2 = self.parent.storage.get_affiliation(node_id, requestor)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._do_purge, node_id)
+        return d
+    
+    def _do_purge(self, result, node_id):
+        configuration = result[0][1]
+        persist_items = configuration["persist_items"]
+        affiliation = result[1][1]
+                                                                                
+        if affiliation != 'owner':
+            raise NotAuthorized
+                                                                                
+        if not persist_items:
+            raise NodeNotPersistent
+                                                                                
+        d = self.parent.storage.purge_node(node_id)
+        d.addCallback(self._do_notify_purge, node_id)
+        return d
+    
+    def _do_notify_purge(self, result, node_id):
+        self.parent.dispatch(node_id, '//event/pubsub/purge')
+
+class NodeDeletionService(service.Service):
+
+    __implements__ = INodeDeletionService,
+
+    def __init__(self):
+        self._callback_list = []
+
+    def register_pre_delete(self, pre_delete_fn):
+        self._callback_list.append(pre_delete_fn)
+
+    def get_subscribers(self, node_id):
+        return self.parent.storage.get_subscribers(node_id)
+
+    def delete_node(self, node_id, requestor):
+        d1 = self.parent.storage.get_node_configuration(node_id)
+        d2 = self.parent.storage.get_affiliation(node_id, requestor)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._do_pre_delete, node_id)
+        return d
+    
+    def _do_pre_delete(self, result, node_id):
+        configuration = result[0][1]
+        persist_items = configuration["persist_items"]
+        affiliation = result[1][1]
+                                                                                
+        if affiliation != 'owner':
+            raise NotAuthorized
+
+        d = defer.DeferredList([cb(node_id) for cb in self._callback_list],
+                               consumeErrors=1)
+        d.addCallback(self._do_delete, node_id)
+
+    def _do_delete(self, result, node_id):
+        dl = []
+        for succeeded, r in result:
+            if succeeded and r:
+                dl.extend(r)
+
+        d = self.parent.storage.delete_node(node_id)
+        d.addCallback(self._do_notify_delete, dl)
+
+        return d
+    
+    def _do_notify_delete(self, result, dl):
+        for d in dl:
+            d.callback(None)
