@@ -1,0 +1,60 @@
+This is the first try at rewriting Idavoll using Twisted Python.
+
+
+What is Idavoll
+===============
+
+A pubsub service, as defined in JEP-0060, aiming to be fully compliant and
+mostly complete. The goal is to build a /generic/ pubsub service, but of which
+parts can be reused for building custom pubsub services for specific
+applications.
+
+
+Current Status
+==============
+
+It is still very experimental, has hardcoded nodes and subscriptions and no
+storage for items.
+
+It does implement the mimimal requirements of JEP-0060 version 1.4. It also
+returns the following features defined in version 1.5 of the specification:
+
+	http://jabber.org/protocol/pubsub#outcast-affil
+	http://jabber.org/protocol/pubsub#publisher-affil
+
+It lacks support for requesting the current affiliations, and doesn't allow
+for discoing for meta-data of nodes. Therefore it is not compliant with 1.5,
+yet.
+
+Requirements
+============
+
+- Twisted >= 1.2.0 
+- The following patches to the twisted/xish directory:
+
+    http://mag.ik.nu/~ralphm/tmp/domish.py.patch
+    http://mag.ik.nu/~ralphm/tmp/utility.py.patch
+    http://mag.ik.nu/~ralphm/tmp/xpath.py.patch
+
+- A jabber server like jabberd 1.4
+
+Usage
+=====
+
+For jabberd 1.4 configuration, put the following in jabber.xml:
+
+  <service id='pubsub.localhost'>
+    <accept>
+      <ip>127.0.0.1</ip>
+      <port>1238</port>
+      <secret>mysecret</secret>
+    </accept>
+  </service>
+
+and restart jabberd.
+
+Then, in the same directory as this file run:
+
+  mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238
+  twistd -rf idavoll.tap
+
