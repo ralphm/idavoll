@@ -31,8 +31,8 @@ class Storage:
             raise backend.NodeNotFound
         else:
             c = self.nodes[node_id].configuration
-            return defer.succeed({'persist_items': c.persist_items,
-                                  'deliver_payloads': c.deliver_payloads})
+            return defer.succeed({'pubsub#persist_items': c.persist_items,
+                                  'pubsub#deliver_payloads': c.deliver_payloads})
 
     def get_affiliation(self, node_id, entity):
         try:
