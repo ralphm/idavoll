@@ -1,3 +1,4 @@
+from twisted.protocols.jabber import jid
 from twisted.python import components
 from twisted.application import service
 from twisted.xish import utility
@@ -156,7 +157,6 @@ class PublishService(service.Service):
         return d
 
     def _do_publish(self, result, node_id, items, requestor):
-        print result
         configuration = result[0][1]
         persist_items = configuration["persist_items"]
         deliver_payloads = configuration["deliver_payloads"]
@@ -212,3 +212,47 @@ class NotificationService(service.Service):
     def register_notifier(self, observerfn, *args, **kwargs):
         self.parent.addObserver('//event/pubsub/notify', observerfn,
                                 *args, **kwargs)
+
+class SubscriptionService(service.Service):
+
+    __implements__ = ISubscriptionService,
+
+    def subscribe(self, node_id, subscriber, requestor):
+        if subscriber.userhostJID() != requestor:
+            raise NotAuthorized
+
+        d1 = self.parent.storage.get_node_configuration(node_id)
+        d2 = self.parent.storage.get_affiliation(node_id, subscriber.full())
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._do_subscribe, node_id, subscriber)
+        return d
+
+    def _do_subscribe(self, result, node_id, subscriber):
+        configuration = result[0][1]
+        affiliation = result[1][1]
+
+        if affiliation == 'outcast':
+            raise NotAuthorized
+
+        d = self.parent.storage.add_subscription(node_id, subscriber.full(),
+                                                 'subscribed')
+        d.addCallback(self._return_subscription, affiliation)
+        return d
+
+    def _return_subscription(self, result, affiliation):
+        result['affiliation'] = affiliation
+        result['jid'] = jid.JID(result['jid'])
+        return result
+
+    def unsubscribe(self, node_id, subscriber, requestor):
+        if subscriber.userhostJID() != requestor:
+            raise NotAuthorized
+
+        d = self.parent.storage.get_node_configuration(node_id)
+        d.addCallback(self._do_unsubscribe, node_id, subscriber)
+        return d
+
+    def _do_unsubscribe(self, result, node_id, subscriber):
+        return self.parent.storage.remove_subscription(node_id,
+                                                       subscriber.full())
