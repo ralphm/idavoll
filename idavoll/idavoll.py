@@ -116,10 +116,10 @@ class LogService(component.Service):
         xmlstream.rawDataOutFn = self.rawDataOut
 
     def rawDataIn(self, buf):
-        print "RECV: %s" % buf.encode('ascii', 'replace')
+        print "RECV: %s" % unicode(buf, 'utf-8').encode('ascii', 'replace')
 
     def rawDataOut(self, buf):
-        print "SEND: %s" % buf.encode('ascii', 'replace')
+        print "SEND: %s" % unicode(buf, 'utf-8').encode('ascii', 'replace')
 
 def makeService(config):
     serviceCollection = service.MultiService()
