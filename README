@@ -1,8 +1,7 @@
-This is the first try at rewriting Idavoll using Twisted Python.
+Idavoll using Twisted Python.
 
-
-What is Idavoll
-===============
+What is Idavoll?
+================
 
 A pubsub service, as defined in JEP-0060, aiming to be fully compliant and
 mostly complete. The goal is to build a /generic/ pubsub service, but of which
@@ -13,30 +12,43 @@ applications.
 Current Status
 ==============
 
-It is still very experimental, has hardcoded nodes and subscriptions and no
-storage for items.
+There are two different backends: one using PostgreSQL for storage, and one
+just keeping everything in memory.
 
-It does implement the mimimal requirements of JEP-0060 version 1.4. It also
-returns the following features defined in version 1.5 of the specification:
+In Idavoll the mimimal requirements of JEP-0060 version 1.6 are implemented.
+It also returns the following features:
 
-	http://jabber.org/protocol/pubsub#outcast-affil
-	http://jabber.org/protocol/pubsub#publisher-affil
+    http://jabber.org/protocol/pubsub#outcast-affiliation
+    http://jabber.org/protocol/pubsub#publisher-affiliation
+    http://jabber.org/protocol/pubsub#persistent-items
+    http://jabber.org/protocol/pubsub#subscribe
+    http://jabber.org/protocol/pubsub#create-nodes
+    http://jabber.org/protocol/pubsub#instant-nodes
 
-It lacks support for requesting the current affiliations, and doesn't allow
-for discoing for meta-data of nodes. Therefore it is not compliant with 1.5,
-yet.
+When using the PostgreSQL backend the following features are also supported:
+
+    http://jabber.org/protocol/pubsub#retrieve-items
 
 Requirements
 ============
 
-- Twisted >= 1.2.0 
+- Twisted >= 1.2.0
 - The following patches to the twisted/xish directory:
 
     http://mag.ik.nu/~ralphm/tmp/domish.py.patch
     http://mag.ik.nu/~ralphm/tmp/utility.py.patch
     http://mag.ik.nu/~ralphm/tmp/xpath.py.patch
 
-- A jabber server like jabberd 1.4
+- The following patches to the twisted/protocols/jabber directory:
+
+    http://mag.ik.nu/~ralphm/tmp/jid.py.patch
+
+- A jabber server like jabberd 1.4.x
+
+For the PostgreSQL backend, the following is also required:
+
+- PostgreSQL
+- pyPgSQL
 
 Usage
 =====
@@ -58,3 +70,28 @@ Then, in the same directory as this file run:
   mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238
   twistd -rf idavoll.tap
 
+This uses the (default) memory based backend.
+
+For using the PostgreSQL backend, create a database (for example named pubsub)
+like so:
+
+  createdb pubsub
+  psql pubsub <db/pubsub.db
+
+Then do:
+
+  mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238 \
+                --backend=pgsql
+  twistd -rf idavoll.tap
+
+For viewing all options, run:
+
+  mktap idavoll --help
+
+Contact
+=======
+
+Questions, comments or suggestions are welcome!
+
+Ralph Meijer
+<xmpp:ralphm@ik.nu>
