@@ -204,8 +204,12 @@ class ComponentServiceFromSubscriptionService(Service):
         if iq.pubsub.options:
             raise SubscribeOptionsUnavailable
 
-        node_id = iq.pubsub.subscribe["node"]
-        subscriber = jid.JID(iq.pubsub.subscribe["jid"])
+        try:
+            node_id = iq.pubsub.subscribe["node"]
+            subscriber = jid.JID(iq.pubsub.subscribe["jid"])
+        except KeyError:
+            raise BadRequest
+
         requestor = jid.JID(iq["from"]).userhostJID()
         d = self.backend.subscribe(node_id, subscriber, requestor)
         d.addCallback(self.return_subscription)
@@ -216,7 +220,7 @@ class ComponentServiceFromSubscriptionService(Service):
         entity = reply.addElement("entity")
         entity["node"] = result["node"]
         entity["jid"] = result["jid"].full()
-        entity["affiliation"] = result["affiliation"]
+        entity["affiliation"] = result["affiliation"] or 'none'
         entity["subscription"] = result["subscription"]
         return [reply]
 
@@ -226,11 +230,10 @@ class ComponentServiceFromSubscriptionService(Service):
     def _onUnsubscribe(self, iq):
         try:
             node_id = iq.pubsub.unsubscribe["node"]
-            jid = iq.pubsub.unsubscribe["jid"]
+            subscriber = jid.JID(iq.pubsub.unsubscribe["jid"])
         except KeyError:
             raise BadRequest
 
-        subscriber = jid.JID(jid)
         requestor = jid.JID(iq["from"]).userhostJID()
         return self.backend.unsubscribe(node_id, subscriber, requestor)
 
