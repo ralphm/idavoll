@@ -114,14 +114,15 @@ class Service(component.Service):
 class ComponentServiceFromService(Service):
 
     def getIdentities(self, node):
-        results = []
-        if not node:
-            results.append({
-                'category': 'pubsub',
-                'type': 'generic',
-                'name': 'Generic Pubsub Service'
-            })
-        return results
+        if node:
+            d = self.backend.get_node_type(node)
+            d.addCallback(lambda x: [{'category': 'pubsub', 'type': x}])
+            d.addErrback(lambda x: [])
+            return d
+        else:
+            return defer.succeed({'category': 'pubsub',
+                                  'type': 'generic',
+                                  'name': 'Generic Pubsub Service'})
 
     def getFeatures(self, node):
         features = []
@@ -136,7 +137,7 @@ class ComponentServiceFromService(Service):
             if self.backend.supports_persistent_items():
                 features.append(NS_PUBSUB + "#persistent-items")
 
-        return features
+        return defer.succeed(features)
 
 components.registerAdapter(ComponentServiceFromService, backend.IBackendService, component.IService)
 
@@ -205,7 +206,7 @@ class ComponentServiceFromSubscriptionService(Service):
         if not node:
             features.append(NS_PUBSUB + "#subscribe")
 
-        return features
+        return defer.succeed(features)
 
     def onSubscribe(self, iq):
         self.handler_wrapper(self._onSubscribe, iq)
@@ -263,6 +264,11 @@ components.registerAdapter(ComponentServiceFromSubscriptionService, backend.ISub
 
 class ComponentServiceFromNodeCreationService(Service):
 
+    def componentConnected(self, xmlstream):
+        xmlstream.addObserver(PUBSUB_CREATE, self.onCreate)
+        xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
+        xmlstream.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet)
+
     def getFeatures(self, node):
         features = []
 
@@ -272,12 +278,7 @@ class ComponentServiceFromNodeCreationService(Service):
             if self.backend.supports_instant_nodes():
                 features.append(NS_PUBSUB + "#instant-nodes")
 
-        return features
-
-    def componentConnected(self, xmlstream):
-        xmlstream.addObserver(PUBSUB_CREATE, self.onCreate)
-        xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
-        xmlstream.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet)
+        return defer.succeed(features)
 
     def onCreate(self, iq):
         self.handler_wrapper(self._onCreate, iq)
