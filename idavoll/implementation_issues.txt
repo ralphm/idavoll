@@ -41,3 +41,5 @@ could produce a large number of notifications. Suggestion: instead send a
 
 - on items attribute max_items. xs:string??
 
+- no disco feature for retracting items, purging nodes, deleting nodes, other
+  owner use cases?
