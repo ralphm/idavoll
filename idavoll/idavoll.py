@@ -78,7 +78,7 @@ class IdavollService(component.Service):
 		if iq.handled == True:
 			return
 
-		self.send(xmpp_error.error_from_iq(iq, 'feature-not-implemented'))
+		self.send(xmpp_error.error_from_iq(iq, 'service-unavailable'))
 
 def makeService(config):
 	serviceCollection = service.MultiService()
