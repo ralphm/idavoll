@@ -65,75 +65,56 @@ class Storage:
     def store_items(self, node_id, items, publisher):
         for item in items:
             self.nodes[node_id].items[item["id"]] = (item, publisher)
-            print self.nodes[node_id].items
         return defer.succeed(None)
 
-class BackendService(backend.BackendService):
-
-    def create_node(self, node_id, requestor):
-        if not node_id:
-            raise backend.NoInstantNodes
-
-        if node_id in self.nodes:
-            raise backend.NodeExists
-    
-        node = Node(node_id)
-        node.affiliations[requestor.full()] = 'owner'
-        self.nodes[node_id] = node
-
-        return defer.succeed({'node_id': node.id})
-
-    def subscribe(self, node_id, subscriber, requestor):
-        # expect subscriber and requestor to be a jid.JID 
+    def add_subscription(self, node_id, subscriber, state):
         try:
             node = self.nodes[node_id]
         except KeyError:
             raise backend.NodeNotFound
 
-        if subscriber.userhostJID() != requestor:
-            raise backend.NotAuthorized
-
-        affiliation = node.affiliations.get(subscriber.full(), 'none')
-
-        if affiliation == 'outcast':
-            raise backend.NotAuthorized
-
         try:
-            subscription = node.subscriptions[subscriber.full()]
-        except KeyError:
-            subscription = Subscription('subscribed')
-            node.subscriptions[subscriber.full()] = subscription
+            subscription = node.subscriptions[subscriber]
+        except:
+            subscription = Subscription(state)
+            node.subscriptions[subscriber] = subscription
 
-        print node.subscriptions
+        return defer.succeed({'node': node_id,
+                              'jid': subscriber,
+                              'subscription': subscription.state})
 
-        return defer.succeed({
-                'affiliation': affiliation,
-                'node': node_id,
-                'jid': subscriber,
-                'subscription': subscription.state})
-    
-    def unsubscribe(self, node_id, subscriber, requestor):
+    def remove_subscription(self, node_id, subscriber):
         try:
             node = self.nodes[node_id]
         except KeyError:
             raise backend.NodeNotFound
 
-        if subscriber.userhostJID() != requestor:
-            raise backend.NotAuthorized
-
         try:
-            del node.subscriptions[subscriber.full()]
+            del node.subscriptions[subscriber]
         except KeyError:
             raise backend.NotSubscribed
 
         return defer.succeed(None)
+
+class BackendService(backend.BackendService):
+    pass
 
 class NodeCreationService(service.Service):
 
     __implements__ = backend.INodeCreationService,
 
     def create_node(self, node_id, requestor):
-        return self.parent.create_node(node_id, requestor)
+        if not node_id:
+            raise backend.NoInstantNodes
+
+        if node_id in self.parent.storage.nodes:
+            raise backend.NodeExists
+    
+        node = Node(node_id)
+        node.affiliations[requestor.full()] = 'owner'
+        self.parent.storage.nodes[node_id] = node
+
+        return defer.succeed({'node_id': node.id})
 
 class PublishService(backend.PublishService):
     pass
@@ -141,12 +122,5 @@ class PublishService(backend.PublishService):
 class NotificationService(backend.NotificationService):
     pass
 
-class SubscriptionService(service.Service):
-
-    __implements__ = backend.ISubscriptionService,
-
-    def subscribe(self, node_id, subscriber, requestor):
-        return self.parent.subscribe(node_id, subscriber, requestor)
-
-    def unsubscribe(self, node_id, subscriber, requestor):
-        return self.parent.unsubscribe(node_id, subscriber, requestor)
+class SubscriptionService(backend.SubscriptionService):
+    pass
