@@ -1,5 +1,4 @@
-Problem:
-  What happens when a node creation request is accompanied by a configure
+- What happens when a node creation request is accompanied by a configure
   node, but node configuration is not implemented?
 
   Solution:
@@ -7,3 +6,13 @@ Problem:
   Reply with a not-acceptable stanza error, with a node-not-configurable
   error attached.
 
+- Node purging with many items in storage and notification of retraction enabled
+could produce a large number of notifications. Suggestion: instead send a
+<event><purge/></event>
+
+- Examples 58 and 62 are the same
+
+- What error to return for outcast user requests?
+  - What if some admin requested it?
+
+- Why not return forbidden when JIDs do not match on subscription?
