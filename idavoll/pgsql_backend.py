@@ -156,8 +156,44 @@ class Storage:
 
         return None
 
+    def create_node(self, node_id, owner):
+        return self.dbpool.runInteraction(self._create_node, node_id,
+                                          owner)
+
+    def _create_node(self, cursor, node_id, owner):
+        try:
+            cursor.execute("""INSERT INTO nodes (node) VALUES (%s)""",
+                           (node_id.encode('utf8')))
+        except:
+            raise backend.NodeExists
+       
+        cursor.execute("""SELECT 1 from entities where jid=%s""",
+                       (owner.encode('utf8')))
+
+        if not cursor.fetchone():
+            cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
+                           (owner.encode('utf8')))
+
+        try:
+            cursor.execute("""INSERT INTO affiliations
+                              (node_id, entity_id, affiliation)
+                              SELECT n.id, e.id, 'owner' FROM
+                              (SELECT id FROM nodes WHERE node=%s) AS n
+                              CROSS JOIN
+                              (SELECT id FROM entities WHERE jid=%s) AS e""",
+                           (node_id.encode('utf8'),
+                            owner.encode('utf8')))
+        except Exception, e:
+            print e
+
+        return None
+
+
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
+
+class NodeCreationService(backend.NodeCreationService):
+    pass
 
 class PublishService(backend.PublishService):
     pass
