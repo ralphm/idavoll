@@ -3,6 +3,8 @@ from twisted.python import components
 from twisted.application import service
 from twisted.xish import utility
 from twisted.internet import defer
+import sha
+import time
 
 class Error(Exception):
     msg = ''
@@ -185,8 +187,9 @@ class PublishService(service.Service):
 
         if persist_items or deliver_payloads:
             for item in items:
-                if item["id"] is None:
-                    item["id"] = 'random'   # FIXME
+                if not item.getAttribute("id"):
+                    item["id"] = sha.new(str(time.time()) +
+                                         requestor.full()).hexdigest()
 
         if persist_items:
             d = self.parent.storage.store_items(node_id, items,
@@ -271,11 +274,12 @@ class NodeCreationService(service.Service):
     __implements__ = INodeCreationService,
 
     def supports_instant_nodes(self):
-        return False
+        return True
 
     def create_node(self, node_id, requestor):
         if not node_id:
-            raise NoInstantNodes
+            node_id = 'generic/%s' % sha.new(str(time.time()) +
+                                             requestor.full()).hexdigest()
 
         d = self.parent.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
