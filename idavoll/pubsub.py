@@ -46,19 +46,9 @@ class OptionsUnavailable(Error):
     stanza_error = 'feature-not-implemented'
     pubsub_error = 'subscription-options-unavailable'
 
-class SubscriptionOptionsUnavailable(Error):
-    stanza_error = 'not-acceptable'
-    pubsub_error = 'subscription-options-unavailable'
-
 class NodeNotConfigurable(Error):
     stanza_error = 'feature-not-implemented'
     pubsub_error = 'node-not-configurable'
-
-class CreateNodeNotConfigurable(Error):
-    stanza_error = 'not-acceptable'
-    pubsub_error = 'node-not-configurable'
-
-
 
 error_map = {
     backend.NotAuthorized:      ('not-authorized', None),
@@ -185,6 +175,14 @@ class ComponentServiceFromPublishService(Service):
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_PUBLISH, self.onPublish)
 
+    def get_disco_info(self, node):
+        info = []
+
+        if not node:
+            info.append(disco.Feature(NS_PUBSUB + "#item-ids"))
+
+        return defer.succeed(info)
+
     def onPublish(self, iq):
         self.handler_wrapper(self._onPublish, iq)
 
@@ -223,9 +221,6 @@ class ComponentServiceFromSubscriptionService(Service):
         self.handler_wrapper(self._onSubscribe, iq)
 
     def _onSubscribe(self, iq):
-        if iq.pubsub.options:
-            raise SubscribeOptionsUnavailable
-
         try:
             node_id = iq.pubsub.subscribe["node"]
             subscriber = jid.JID(iq.pubsub.subscribe["jid"])
@@ -295,9 +290,6 @@ class ComponentServiceFromNodeCreationService(Service):
         self.handler_wrapper(self._onCreate, iq)
 
     def _onCreate(self, iq):
-        if iq.pubsub.options:
-            raise CreateNodeNotConfigurable
-
         node = iq.pubsub.create.getAttribute("node")
 
         owner = jid.JID(iq["from"]).userhostJID()
