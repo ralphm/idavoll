@@ -16,3 +16,12 @@ could produce a large number of notifications. Suggestion: instead send a
   - What if some admin requested it?
 
 - Why not return forbidden when JIDs do not match on subscription?
+
+- What to do when receiving an unsubscription request with a subid, when
+  subids are not supported? Ignore or reply with bad-request?
+
+- unsubscription: why check for the requestor being subscribed. You want to
+  check if the jid is subscribed. An not-authorized can be sent if the
+  requestor and jid don't match. Otherwise, unexpected-request might
+  be appropriate when the jid is not subscribed along with a special
+  child element of not-subscribed in the pubsub#error namespace. 
