@@ -25,3 +25,10 @@ could produce a large number of notifications. Suggestion: instead send a
   requestor and jid don't match. Otherwise, unexpected-request might
   be appropriate when the jid is not subscribed along with a special
   child element of not-subscribed in the pubsub#error namespace. 
+
+- 8.1.7 states:
+    If subscription identifiers are supported by the service and the entity's
+    subscription is not NONE or OUTCAST, the 'subid' attribute MUST be present
+    as well as the 'jid' attribute.
+  There is no such thing as a subscription of 'OUTCAST'. Also, I'm not sure
+  why NONE is capitalized.
