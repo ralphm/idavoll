@@ -1,4 +1,5 @@
 conditions = {
+	'bad-request':				{'code': '400', 'type': 'modify'},
 	'not-authorized':			{'code': '401', 'type': 'cancel'},
 	'item-not-found':			{'code': '404', 'type': 'cancel'},
 	'feature-not-implemented':	{'code': '501', 'type': 'cancel'},
