@@ -106,6 +106,34 @@ class Storage:
 
         return defer.succeed(None)
 
+    def get_affiliations(self, entity):
+        affiliations = []
+        for node in self.nodes.itervalues():
+            if entity.full() in node.affiliations:
+                affiliations.append((node.id,
+                                     node.affiliations[entity.full()]))
+
+        return defer.succeed(affiliations)
+
+    def get_subscriptions(self, entity):
+        subscriptions = []
+        for node in self.nodes.itervalues():
+            for subscriber, subscription in node.subscriptions.iteritems():
+                subscriber_jid = jid.JID(subscriber)
+                if subscriber_jid.userhostJID() == entity:
+                    subscriptions.append((node.id, subscriber_jid,
+                                          subscription.state))
+        return defer.succeed(subscriptions)
+
+    def get_node_type(self, node_id):
+        if node_id not in self.nodes:
+            raise backend.NodeNotFound
+
+        return defer.succeed('leaf')
+
+    def get_nodes(self):
+        return defer.succeed(self.nodes.keys())
+
 class BackendService(backend.BackendService):
     pass
 
@@ -119,4 +147,7 @@ class NotificationService(backend.NotificationService):
     pass
 
 class SubscriptionService(backend.SubscriptionService):
+    pass
+
+class AffiliationsService(backend.AffiliationsService):
     pass
