@@ -1,7 +1,7 @@
 from twisted.protocols.jabber import component
 from twisted.application import service
 from twisted.python import components
-import backend
+import memory_backend
 import pubsub
 import xmpp_error
 
@@ -83,13 +83,13 @@ class IdavollService(component.Service):
 def makeService(config):
 	serviceCollection = service.MultiService()
 
-	pss = backend.MemoryBackendService()
+	b = memory_backend.MemoryBackendService()
 
 	# set up Jabber Component
 	c = component.buildServiceManager(config["jid"], config["secret"],
 			("tcp:%s:%s" % (config["rhost"], config["rport"])))
 
-	s = component.IService(pss)
+	s = component.IService(b)
 	s.jid = config["jid"]
 	s.setServiceParent(c)
 
