@@ -135,19 +135,11 @@ class NodeCreationService(service.Service):
     def create_node(self, node_id, requestor):
         return self.parent.create_node(node_id, requestor)
 
-class PublishService(service.Service):
+class PublishService(backend.PublishService):
+    pass
 
-    __implements__ = backend.IPublishService,
-    
-    def publish(self, node_id, items, requestor):
-        return self.parent.publish(node_id, items, requestor)
-    
 class NotificationService(backend.NotificationService):
-
-    __implements__ = backend.INotificationService,
-
-    def get_notification_list(self, node_id, items):
-        return self.parent.get_notification_list(node_id, items)
+    pass
 
 class SubscriptionService(service.Service):
 
@@ -158,11 +150,3 @@ class SubscriptionService(service.Service):
 
     def unsubscribe(self, node_id, subscriber, requestor):
         return self.parent.unsubscribe(node_id, subscriber, requestor)
-
-class PersistenceService(service.Service):
-
-    __implements__ = backend.IPersistenceService,
-
-    def store_items(self, node_id, items, publisher):
-        return self.parent.store_items(node_id, items, publisher)
-
