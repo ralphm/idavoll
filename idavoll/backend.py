@@ -57,6 +57,7 @@ class MemoryBackendService(service.Service):
 
 		node = Node("ralphm/mood/ralphm@ik.nu")
 		node.subscriptions["ralphm@doe.ik.nu"] = Subscription("subscribed")
+		node.subscriptions["notify@ik.nu/mood_monitor"] = Subscription("subscribed")
 		node.affiliations["ralphm@ik.nu"] = "owner"
 		node.affiliations["ralphm@doe.ik.nu"] = "publisher"
 		node.configuration.persist_items = True
@@ -77,10 +78,6 @@ class MemoryBackendService(service.Service):
 					raise NotAuthorized
 			except KeyError:
 				raise NotAuthorized()
-
-			# the following is under the assumption that the publisher
-			# has to provide an item when the node is persistent, but
-			# an empty notification is to be sent.
 
 			if items and not persist_items and not deliver_payloads:
 				raise NoPayloadAllowed
@@ -107,8 +104,7 @@ class MemoryBackendService(service.Service):
 
 			return defer.succeed(None)
 		except:
-			f = failure.Failure()
-			return defer.fail(f)
+			return defer.fail(failure.Failure())
 
 	def do_subscribe(self, node_id, subscriber, requestor):
 		# expect subscriber and requestor to be a jid.JID 
@@ -144,8 +140,7 @@ class MemoryBackendService(service.Service):
 					'jid': subscriber,
 					'subscription': subscription.state})
 		except:
-			f = failure.Failure()
-			return defer.fail(f)
+			return defer.fail(failure.Failure)
 
 		
 	def magic_filter(self, subscribers, node_id, items):

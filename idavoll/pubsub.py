@@ -74,7 +74,7 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 	def success(self, result, iq):
 		iq.swapAttributeValues("to", "from")
 		iq["type"] = 'result'
-		iq.children = []
+		iq.children = result or []
 		return iq
 
 	def notImplemented(self, iq):
@@ -114,18 +114,19 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		subscriber = jid.JID(iq.pubsub.subscribe["jid"])
 		requestor = jid.JID(iq["from"]).userhostJID()
 		d = self.backend.do_subscribe(node_id, subscriber, requestor)
-		d.addCallback(self.return_subscription, iq)
+		d.addCallback(self.return_subscription)
+		d.addCallback(self.succeed, iq)
 		d.addErrback(self.error, iq)
 		d.addCallback(self.send)
 
-	def return_subscription(self, result, iq):
-		reply = self.success(result, iq)
+	def return_subscription(self, result):
+		reply = domish.Element("pubsub", NS_PUBSUB)
 		entity = reply.addElement("entity")
 		entity["node"] = result["node"]
 		entity["jid"] = result["jid"].full()
 		entity["affiliation"] = result["affiliation"]
 		entity["subscription"] = result["subscription"]
-		return iq
+		return reply
 
 	def do_notification(self, list, node):
 
