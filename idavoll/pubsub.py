@@ -208,11 +208,11 @@ class ComponentServiceFromBackend(component.Service):
 		message = domish.Element((NS_COMPONENT, "message"))
 		message["from"] = self.parent.jabberId
 		message["to"] = recipient
-		x = message.addElement((NS_PUBSUB_EVENT, "x"), NS_PUBSUB_EVENT)
-		items = x.addElement("items")
+		event = message.addElement((NS_PUBSUB_EVENT, "event"), NS_PUBSUB_EVENT)
+		items = event.addElement("items")
 		items["node"] = node
 		items.children.extend(itemlist)
 		self.send(message)
 		
-components.registerAdapter(ComponentServiceFromBackend, backend.IBackendService, component.IService)
+components.registerAdapter(ComponentServiceFromBackend, backend.IService, component.IService)
 
