@@ -41,6 +41,16 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		xmlstream.addObserver(PUBSUB_SET, self.onPubSub)
 		xmlstream.addObserver(PUBSUB_GET, self.onPubSub)
 
+	def getIdentities(self, node):
+		results = []
+		if not node:
+			results.append({
+				'category': 'pubsub',
+				'type': 'generic',
+				'name': 'Generic Pubsub Service'
+			})
+		return results
+
 	def error(self, failure, iq):
 		r = failure.trap(*error_map.keys())
 
