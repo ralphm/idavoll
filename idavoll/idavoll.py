@@ -52,7 +52,7 @@ class IdavollService(component.Service):
             if components.implements(c, component.IService):
                 if hasattr(c, "get_disco_info"):
                     dl.append(c.get_disco_info(node))
-        d = defer.DeferredList(dl, fireOnOneErrback=1)
+        d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
         d.addCallback(self._disco_info_results, iq, node)
         d.addErrback(self._error, iq)
         d.addCallback(self.send)
@@ -84,7 +84,7 @@ class IdavollService(component.Service):
             if components.implements(c, component.IService):
                 if hasattr(c, "get_disco_items"):
                     dl.append(c.get_disco_items(node))
-        d = defer.DeferredList(dl, fireOnOneErrback=1)
+        d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
         d.addCallback(self._disco_items_result, iq, node)
         d.addErrback(self._error, iq)
         d.addCallback(self.send)

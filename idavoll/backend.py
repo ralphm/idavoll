@@ -198,7 +198,7 @@ class PublishService(service.Service):
     def publish(self, node_id, items, requestor):
         d1 = self.parent.storage.get_node_configuration(node_id)
         d2 = self.parent.storage.get_affiliation(node_id, requestor)
-        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1, consumeErrors=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._do_publish, node_id, items, requestor)
         return d
@@ -270,7 +270,7 @@ class SubscriptionService(service.Service):
 
         d1 = self.parent.storage.get_node_configuration(node_id)
         d2 = self.parent.storage.get_affiliation(node_id, subscriber)
-        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1, consumeErrors=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._do_subscribe, node_id, subscriber)
         return d
@@ -326,7 +326,7 @@ class AffiliationsService(service.Service):
     def get_affiliations(self, entity):
         d1 = self.parent.storage.get_affiliations(entity)
         d2 = self.parent.storage.get_subscriptions(entity)
-        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1, consumeErrors=1)
         d.addErrback(lambda x: x.value[0])
         d.addCallback(self._affiliations_result, entity)
         return d
