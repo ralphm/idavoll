@@ -5,6 +5,9 @@ from twisted.internet import defer, reactor
 class IBackendService(components.Interface):
 	""" Interface to a backend service of a pubsub service """
 
+	def do_publish(self, node, publisher, item):
+		""" Returns a deferred that returns """
+
 class BackendException(Exception):
 	def __init__(self, msg = ''):
 		self.msg = msg
@@ -26,8 +29,8 @@ class MemoryBackendService(service.Service):
 
 	def __init__(self):
 		self.nodes = {"ralphm/test": 'test'}
-		self.subscribers = {"ralphm/test": ["ralphm@ik.nu", "intosi@ik.nu"] }
-		self.affiliations = {"ralphm/test": { "ralphm@ik.nu": "owner", "ralphm@se-135.se.wtb.tue.nl": 'publisher' } }
+		self.subscribers = {"ralphm/test": ["ralphm@ik.nu", "ralphm@doe.ik.nu"] }
+		self.affiliations = {"ralphm/test": { "ralphm@ik.nu": "owner", "ralphm@se-135.se.wtb.tue.nl": 'publisher', 'ralphm@doe.ik.nu': 'publisher' } }
 
 	def do_publish(self, node, publisher, item):
 		try:
@@ -42,11 +45,20 @@ class MemoryBackendService(service.Service):
 					raise NotAuthorized
 			except KeyError:
 				raise NotAuthorized()
+
 			print "publish by %s to %s" % (publisher, node)
+
+			recipients = self.get_subscribers(node)
+			recipients.addCallback(self.magic_filter, node, item)
+			recipients.addCallback(self.pubsub_service.do_notification, node, item)
+
 			return defer.succeed(result)
 		except:
 			f = failure.Failure()
 			return defer.fail(f)
+
+	def magic_filter(self, subscribers, node, item):
+		return subscribers
 
 	def get_subscribers(self, node):
 		d = defer.Deferred()

@@ -1,14 +1,18 @@
 from twisted.protocols.jabber import component,jid
-from twisted.xish import utility
+from twisted.xish import utility, domish
 from twisted.python import components
 import backend
 import xmpp_error
 
+NS_COMPONENT = 'jabber:component:accept'
+NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
+NS_PUBSUB_EVENT = NS_PUBSUB + '#event'
+
 IQ_GET = '/iq[@type="get"]'
 IQ_SET = '/iq[@type="set"]'
-PUBSUB_GET = IQ_GET + '/pubsub[@xmlns="http://jabber.org/protocol/pubsub"]'
-PUBSUB_SET = IQ_SET + '/pubsub[@xmlns="http://jabber.org/protocol/pubsub"]'
-
+PUBSUB_ELEMENT = '/pubsub[@xmlns="' + NS_PUBSUB + '"]'
+PUBSUB_GET = IQ_GET + PUBSUB_ELEMENT
+PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
 
@@ -17,6 +21,7 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 	def __init__(self, backend):
 		utility.EventDispatcher.__init__(self)
 		self.backend = backend
+		self.backend.pubsub_service = self
 		self.addObserver(PUBSUB_PUBLISH, self.onPublish)
 
 	def componentConnected(self, xmlstream):
@@ -52,7 +57,21 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 		d.addErrback(self.error, iq)
 		d.addCallback(self.send)
 
+	def do_notification(self, recipients, node, item):
 
+		for recipient in recipients:
+			self.notify(node, item, recipient)
+
+	def notify(self, node, item, recipient):
+		message = domish.Element((NS_COMPONENT, "message"))
+		message["from"] = self.parent.jabberId
+		message["to"] = recipient
+		x = message.addElement((NS_PUBSUB_EVENT, "x"), NS_PUBSUB_EVENT)
+		items = x.addElement("items")
+		items["node"] = node
+		items.children.append(item)
+		self.send(message)
+		
 """
 	def onCreateSet(self, iq):
 		node = iq.pubsub.create["node"]
