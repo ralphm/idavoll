@@ -1,0 +1,9 @@
+Problem:
+  What happens when a node creation request is accompanied by a configure
+  node, but node configuration is not implemented?
+
+  Solution:
+
+  Reply with a not-acceptable stanza error, with a node-not-configurable
+  error attached.
+
