@@ -30,10 +30,9 @@ class IdavollService(component.Service):
 
 	def getFeatures(self, node):
 		if not node:
-			return [NS_DISCO_INFO, NS_DISCO_ITEMS, NS_VERSION]
+			return [NS_DISCO_ITEMS, NS_VERSION]
 	
 	def onVersion(self, iq):
-		print "version?"
 		iq.swapAttributeValues("to", "from")
 		iq["type"] = "result"
 		name = iq.addElement("name", None, 'Idavoll')
