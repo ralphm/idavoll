@@ -33,6 +33,9 @@ class Error(Exception):
 class NotImplemented(Error):
     stanza_error = 'feature-not-implemented'
 
+class BadRequest(Error):
+    stanza_error = 'bad-request'
+
 class OptionsUnavailable(Error):
     stanza_error = 'feature-not-implemented'
     pubsub_error = 'subscription-options-unavailable'
@@ -48,6 +51,8 @@ class NodeNotConfigurable(Error):
 class CreateNodeNotConfigurable(Error):
     stanza_error = 'not-acceptable'
     pubsub_error = 'node-not-configurable'
+
+
 
 error_map = {
     backend.NotAuthorized:      ('not-authorized', None),
@@ -219,8 +224,13 @@ class ComponentServiceFromSubscriptionService(Service):
         self.handler_wrapper(self._onUnsubscribe, iq)
 
     def _onUnsubscribe(self, iq):
-        node_id = iq.pubsub.unsubscribe["node"]
-        subscriber = jid.JID(iq.pubsub.unsubscribe["jid"])
+        try:
+            node_id = iq.pubsub.unsubscribe["node"]
+            jid = iq.pubsub.unsubscribe["jid"]
+        except KeyError:
+            raise BadRequest
+
+        subscriber = jid.JID(jid)
         requestor = jid.JID(iq["from"]).userhostJID()
         return self.backend.unsubscribe(node_id, subscriber, requestor)
 
