@@ -5,6 +5,7 @@ from twisted.internet import defer
 
 import backend
 import xmpp_error
+import disco
 
 NS_COMPONENT = 'jabber:component:accept'
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
@@ -113,31 +114,37 @@ class Service(component.Service):
 
 class ComponentServiceFromService(Service):
 
-    def getIdentities(self, node):
-        if node:
-            d = self.backend.get_node_type(node)
-            d.addCallback(lambda x: [{'category': 'pubsub', 'type': x}])
-            d.addErrback(lambda x: [])
-            return d
-        else:
-            return defer.succeed({'category': 'pubsub',
-                                  'type': 'generic',
-                                  'name': 'Generic Pubsub Service'})
-
-    def getFeatures(self, node):
-        features = []
+    def get_disco_info(self, node):
+        info = []
 
         if not node:
+            info.append(disco.Identity('pubsub', 'generic',
+                                       'Generic Pubsub Service'))
+
             if self.backend.supports_publisher_affiliation():
-                features.append(NS_PUBSUB + "#publisher-affiliation")
+                info.append(disco.Feature(NS_PUBSUB + "#publisher-affiliation"))
 
             if self.backend.supports_outcast_affiliation():
-                features.append(NS_PUBSUB + "#outcast-affiliation")
+                info.append(disco.Feature(NS_PUBSUB + "#outcast-affiliation"))
 
             if self.backend.supports_persistent_items():
-                features.append(NS_PUBSUB + "#persistent-items")
+                info.append(disco.Feature(NS_PUBSUB + "#persistent-items"))
 
-        return defer.succeed(features)
+            return defer.succeed(info)
+        else:
+            d = self.backend.get_node_type(node)
+            d.addCallback(lambda x: [disco.Identity('pubsub', x)])
+            d.addErrback(lambda _: [])
+            return d
+
+    def get_disco_items(self, node):
+        if node:
+            return defer.succeed([])
+        
+        d = self.backend.get_nodes()
+        d.addCallback(lambda nodes: [disco.Item(self.parent.jabberId, node)
+                                    for node in nodes])
+        return d
 
 components.registerAdapter(ComponentServiceFromService, backend.IBackendService, component.IService)
 
@@ -200,13 +207,13 @@ class ComponentServiceFromSubscriptionService(Service):
         xmlstream.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
         xmlstream.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet)
     
-    def getFeatures(self, node):
-        features = []
+    def get_disco_info(self, node):
+        info = []
 
         if not node:
-            features.append(NS_PUBSUB + "#subscribe")
+            info.append(disco.Feature(NS_PUBSUB + '#subscribe'))
 
-        return defer.succeed(features)
+        return defer.succeed(info)
 
     def onSubscribe(self, iq):
         self.handler_wrapper(self._onSubscribe, iq)
@@ -269,16 +276,16 @@ class ComponentServiceFromNodeCreationService(Service):
         xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
         xmlstream.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet)
 
-    def getFeatures(self, node):
-        features = []
+    def get_disco_info(self, node):
+        info = []
 
         if not node:
-            features.append(NS_PUBSUB + "#create-nodes")
+            info.append(disco.Feature(NS_PUBSUB + "#create-nodes"))
 
             if self.backend.supports_instant_nodes():
-                features.append(NS_PUBSUB + "#instant-nodes")
+                info.append(disco.Feature(NS_PUBSUB + "#instant-nodes"))
 
-        return defer.succeed(features)
+        return defer.succeed(info)
 
     def onCreate(self, iq):
         self.handler_wrapper(self._onCreate, iq)
