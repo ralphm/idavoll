@@ -51,6 +51,14 @@ class ComponentServiceFromBackend(component.Service, utility.EventDispatcher):
 			})
 		return results
 
+	def getFeatures(self, node):
+		return [
+			"http://jabber.org/protocol/pubsub#outcast-affil",
+			"http://jabber.org/protocol/pubsub#publisher-affil",
+			# We do not really store items yet
+			# "http://jabber.org/protocol/pubsub#persistent-items",
+			]
+
 	def error(self, failure, iq):
 		r = failure.trap(*error_map.keys())
 
