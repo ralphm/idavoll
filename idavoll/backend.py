@@ -150,6 +150,10 @@ class BackendService(service.MultiService, utility.EventDispatcher):
     def supports_persistent_items(self):
         return True
 
+    def get_node_type(self, node_id):
+        d = self.storage.get_node_type(node_id)
+        return d
+
 class PublishService(service.Service):
     
     __implements__ = IPublishService,
