@@ -171,6 +171,10 @@ def makeService(config):
         bsc.setServiceParent(bs)
         component.IService(bsc).setServiceParent(sm)
 
+        bsc = b.NodeDeletionService()
+        bsc.setServiceParent(bs)
+        component.IService(bsc).setServiceParent(sm)
+
     s = IdavollService()
     s.setServiceParent(sm)
 
