@@ -109,12 +109,27 @@ class IdavollService(component.Service):
 
         self.send(xmpp_error.error_from_iq(iq, 'service-unavailable'))
 
+class LogService(component.Service):
+
+    def transportConnected(self, xmlstream):
+        xmlstream.rawDataInFn = self.rawDataIn
+        xmlstream.rawDataOutFn = self.rawDataOut
+
+    def rawDataIn(self, buf):
+        print "RECV: %s" % buf.encode('ascii', 'replace')
+
+    def rawDataOut(self, buf):
+        print "SEND: %s" % buf.encode('ascii', 'replace')
+
 def makeService(config):
     serviceCollection = service.MultiService()
 
     # set up Jabber Component
     sm = component.buildServiceManager(config["jid"], config["secret"],
             ("tcp:%s:%s" % (config["rhost"], config["rport"])))
+
+    if config["verbose"]:
+        LogService().setServiceParent(sm)
 
     if config['backend'] == 'pgsql':
         import pgsql_backend as b

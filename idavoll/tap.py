@@ -13,6 +13,8 @@ class Options(usage.Options):
 		('dbuser', None, ''),
 		('dbname', None, 'pubsub'),
 	]
+
+	optFlags = [('verbose', 'v', 'Show traffic')]
 	
 	def postOptions(self):
 		if self['backend'] not in ['pgsql', 'memory']:
