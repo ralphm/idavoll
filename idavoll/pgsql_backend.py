@@ -84,23 +84,8 @@ class Storage:
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
 
-class PublishService(service.Service):
-
-    __implements__ = backend.IPublishService,
-    
-    def publish(self, node_id, items, requestor):
-        return self.parent.publish(node_id, items, requestor)
+class PublishService(backend.PublishService):
+    pass
 
 class NotificationService(backend.NotificationService):
-
-    __implements__ = backend.INotificationService,
-
-    def get_notification_list(self, node_id, items):
-        return self.parent.get_notification_list(node_id, items)
-
-class PersistenceService(service.Service):
-
-    __implements__ = backend.IPersistenceService,
-
-    def store_items(self, node_id, items, publisher):
-        return self.parent.store_items(node_id, items, publisher)
+    pass
