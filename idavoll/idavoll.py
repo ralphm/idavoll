@@ -105,10 +105,6 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
-    bsc = b.NotificationService()
-    bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
-
     bsc = b.SubscriptionService()
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
