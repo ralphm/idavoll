@@ -36,9 +36,6 @@ class BackendService(backend.BackendService):
         node.configuration.deliver_payloads = True
         self.nodes[node.id] = node
     
-    def get_supported_affiliations(self):
-        return ['none', 'owner', 'outcast', 'publisher']
-
     def create_node(self, node_id, requestor):
         if not node_id:
             raise backend.NoInstantNodes
@@ -80,7 +77,7 @@ class BackendService(backend.BackendService):
                     item["id"] = 'random'   # FIXME
 
         if persist_items:
-            self.store_items(node_id, items, requestor)
+            self.store_items(node_id, items, requestor.full())
 
         if items and not deliver_payloads:
             for item in items:
