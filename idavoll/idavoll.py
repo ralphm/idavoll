@@ -58,11 +58,11 @@ class IdavollService(component.Service):
 			iq.swapAttributeValues("to", "from")
 			iq["type"] = "result"
 			for identity in identities:
-				iq.query.addElement("identity", None)
-				iq.query.identity.attributes = identity
+				i = iq.query.addElement("identity")
+				i.attributes = identity
 			print features
 			for feature in features:
-				f = iq.query.addElement("feature", None)
+				f = iq.query.addElement("feature")
 				f["var"] = feature
 
 		self.send(iq)
