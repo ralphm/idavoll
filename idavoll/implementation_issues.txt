@@ -38,3 +38,6 @@ could produce a large number of notifications. Suggestion: instead send a
   Assumed meta-data as per JEP-0128 is indeed optional, advertised with the
   pubsub#meta-data disco feature. Also, how do you actually set this meta-data
   information?
+
+- on items attribute max_items. xs:string??
+
