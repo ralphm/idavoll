@@ -19,43 +19,45 @@ PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
 PUBSUB_SUBSCRIBE = PUBSUB_SET + '/subscribe'
+PUBSUB_UNSUBSCRIBE = PUBSUB_SET + '/unsubscribe'
 PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
 
-class PubSubError(Exception):
+class Error(Exception):
     pubsub_error = None
+    stanza_error = None
     msg = ''
 
-class NotImplemented(PubSubError):
-    pass
+class NotImplemented(Error):
+    stanza_error = 'feature-not-implemented'
 
-class OptionsUnavailable(PubSubError):
+class OptionsUnavailable(Error):
+    stanza_error = 'feature-not-implemented'
     pubsub_error = 'subscription-options-unavailable'
 
-class SubscriptionOptionsUnavailable(PubSubError):
+class SubscriptionOptionsUnavailable(Error):
+    stanza_error = 'not-acceptable'
     pubsub_error = 'subscription-options-unavailable'
 
-class NodeNotConfigurable(PubSubError):
+class NodeNotConfigurable(Error):
+    stanza_error = 'feature-not-implemented'
     pubsub_error = 'node-not-configurable'
 
-class CreateNodeNotConfigurable(PubSubError):
+class CreateNodeNotConfigurable(Error):
+    stanza_error = 'not-acceptable'
     pubsub_error = 'node-not-configurable'
 
 error_map = {
-    backend.NotAuthorized:          'not-authorized',
-    backend.NodeNotFound:           'item-not-found',
-    backend.NoPayloadAllowed:       'bad-request',
-    backend.PayloadExpected:        'bad-request',
-    backend.NoInstantNodes:         'not-acceptable',
-    backend.NodeExists:             'conflict',
-    backend.NotImplemented:         'feature-not-implemented',
-    NotImplemented:                 'feature-not-implemented',
-    OptionsUnavailable:             'feature-not-implemented',
-    SubscriptionOptionsUnavailable: 'not-acceptable',
-    NodeNotConfigurable:            'feature-not-implemented',
-    CreateNodeNotConfigurable:      'not-acceptable',
+    backend.NotAuthorized:      ('not-authorized', None),
+    backend.NodeNotFound:       ('item-not-found', None),
+    backend.NoPayloadAllowed:   ('bad-request', None),
+    backend.PayloadExpected:    ('bad-request', None),
+    backend.NoInstantNodes:     ('not-acceptable', None),
+    backend.NodeExists:         ('conflict', None),
+    backend.NotImplemented:     ('feature-not-implemented', None),
+    backend.NotSubscribed:      ('not-authorized', 'requestor-not-subscribed'),
 }
 
 class Service(component.Service):
@@ -65,18 +67,21 @@ class Service(component.Service):
     def __init__(self, backend):
         self.backend = backend
 
-    def componentConnected(self, xmlstream):
-        pass
-
     def error(self, failure, iq):
         try: 
-            r = failure.trap(*error_map.keys())
-            xmpp_error.error_from_iq(iq, error_map[r], failure.value.msg)
-            if isinstance(failure.value, PubSubError) and \
-               failure.value.pubsub_error is not None:
-                iq.error.addElement((NS_PUBSUB_ERRORS,
-                                     failure.value.pubsub_error),
-                                    NS_PUBSUB_ERRORS)
+            e = failure.trap(Error, *error_map.keys())
+
+            if e == Error:
+                stanza_error = failure.value.stanza_error
+                pubsub_error = failure.value.pubsub_error
+                msg = ''
+            else:
+                stanza_error, pubsub_error = error_map[e]
+                msg = failure.value.msg
+
+            xmpp_error.error_from_iq(iq, stanza_error, msg)
+            if pubsub_error:
+                iq.error.addElement((NS_PUBSUB_ERRORS, pubsub_error))
             return iq
         except:
             xmpp_error.error_from_iq(iq, 'internal-server-error')
@@ -130,8 +135,7 @@ components.registerAdapter(ComponentServiceFromService, backend.IBackendService,
 
 class ComponentServiceFromNotificationService(Service):
 
-    def __init__(self, backend):
-        Service.__init__(self, backend)
+    def componentConnected(self, xmlstream):
         self.backend.register_notifier(self.notify)
         
     def notify(self, object):
@@ -141,6 +145,7 @@ class ComponentServiceFromNotificationService(Service):
         d.addCallback(self._notify, node_id)
 
     def _notify(self, list, node_id):
+        print list
         for recipient, items in list.items():
             self._notify_recipient(recipient, node_id, items)
 
@@ -148,7 +153,7 @@ class ComponentServiceFromNotificationService(Service):
         message = domish.Element((NS_COMPONENT, "message"))
         message["from"] = self.parent.jabberId
         message["to"] = recipient
-        event = message.addElement((NS_PUBSUB_EVENT, "event"), NS_PUBSUB_EVENT)
+        event = message.addElement((NS_PUBSUB_EVENT, "event"))
         items = event.addElement("items")
         items["node"] = node_id
         items.children.extend(itemlist)
@@ -183,6 +188,9 @@ class ComponentServiceFromSubscriptionService(Service):
 
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_SUBSCRIBE, self.onSubscribe)
+        xmlstream.addObserver(PUBSUB_UNSUBSCRIBE, self.onUnsubscribe)
+        xmlstream.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
+        xmlstream.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet)
 
     def onSubscribe(self, iq):
         self.handler_wrapper(self._onSubscribe, iq)
@@ -194,26 +202,39 @@ class ComponentServiceFromSubscriptionService(Service):
         node_id = iq.pubsub.subscribe["node"]
         subscriber = jid.JID(iq.pubsub.subscribe["jid"])
         requestor = jid.JID(iq["from"]).userhostJID()
-        d = self.backend.do_subscribe(node_id, subscriber, requestor)
+        d = self.backend.subscribe(node_id, subscriber, requestor)
         d.addCallback(self.return_subscription)
-        d.addCallback(self.succeed, iq)
-        d.addErrback(self.error, iq)
-        d.addCallback(self.send)
-
-    def _onConfigureGet(self, iq):
-        raise NodeNotConfigurable
-
-    def _onConfigureSet(self, iq):
-        raise NodeNotConfigurable
+        return d
 
     def return_subscription(self, result):
-        reply = domish.Element("pubsub", NS_PUBSUB)
+        reply = domish.Element((NS_PUBSUB, "pubsub"), NS_PUBSUB)
         entity = reply.addElement("entity")
         entity["node"] = result["node"]
         entity["jid"] = result["jid"].full()
         entity["affiliation"] = result["affiliation"]
         entity["subscription"] = result["subscription"]
-        return reply
+        return [reply]
+
+    def onUnsubscribe(self, iq):
+        self.handler_wrapper(self._onUnsubscribe, iq)
+
+    def _onUnsubscribe(self, iq):
+        node_id = iq.pubsub.unsubscribe["node"]
+        subscriber = jid.JID(iq.pubsub.unsubscribe["jid"])
+        requestor = jid.JID(iq["from"]).userhostJID()
+        return self.backend.unsubscribe(node_id, subscriber, requestor)
+
+    def onOptionsGet(self, iq):
+        self.handler_wrapper(self._onOptionsGet, iq)
+
+    def _onOptionsGet(self, iq):
+        raise OptionsUnavailable
+
+    def onOptionsSet(self, iq):
+        self.handler_wrapper(self._onOptionsSet, iq)
+
+    def _onOptionsSet(self, iq):
+        raise OptionsUnavailable
 
 components.registerAdapter(ComponentServiceFromSubscriptionService, backend.ISubscriptionService, component.IService)
 
@@ -221,6 +242,8 @@ class ComponentServiceFromNodeCreationService(Service):
 
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_CREATE, self.onCreate)
+        xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
+        xmlstream.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet)
 
     def onCreate(self, iq):
         self.handler_wrapper(self._onCreate, iq)
@@ -236,17 +259,23 @@ class ComponentServiceFromNodeCreationService(Service):
         d.addCallback(self.return_create_response, iq)
         return d
 
-    def _onOptionsGet(self, iq):
-        raise OptionsUnavailable
-
-    def _onOptionsSet(self, iq):
-        raise OptionsUnavailable
-
     def return_create_response(self, result, iq):
         if iq.pubsub.create["node"] is None:
             reply = domish.Element('pubsub', NS_PUBSUB)
             entity = reply.addElement('create')
             entity['node'] = result['node_id']
             return reply
+
+    def onConfigureGet(self, iq):
+        self.handler_wrapper(self._onConfigureGet, iq)
+
+    def _onConfigureGet(self, iq):
+        raise NodeNotConfigurable
+
+    def onConfigureSet(self, iq):
+        self.handler_wrapper(self._onConfigureSet, iq)
+
+    def _onConfigureSet(self, iq):
+        raise NodeNotConfigurable
 
 components.registerAdapter(ComponentServiceFromNodeCreationService, backend.INodeCreationService, component.IService)
