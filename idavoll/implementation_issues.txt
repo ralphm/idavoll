@@ -32,3 +32,9 @@ could produce a large number of notifications. Suggestion: instead send a
     as well as the 'jid' attribute.
   There is no such thing as a subscription of 'OUTCAST'. Also, I'm not sure
   why NONE is capitalized.
+
+- On meta-data:
+  http://mail.jabber.org/pipermail/standards-jig/2004-July/005783.html
+  Assumed meta-data as per JEP-0128 is indeed optional, advertised with the
+  pubsub#meta-data disco feature. Also, how do you actually set this meta-data
+  information?
