@@ -117,6 +117,10 @@ class Service(component.Service):
 
 class ComponentServiceFromService(Service):
 
+    def __init__(self, backend):
+        Service.__init__(self, backend)
+        self.hide_nodes = False
+
     def get_disco_info(self, node):
         info = []
 
@@ -141,7 +145,7 @@ class ComponentServiceFromService(Service):
             return d
 
     def get_disco_items(self, node):
-        if node:
+        if node or self.hide_nodes:
             return defer.succeed([])
         
         d = self.backend.get_nodes()

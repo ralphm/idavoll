@@ -140,7 +140,9 @@ def makeService(config):
 
     bs = b.BackendService(st)
 
-    component.IService(bs).setServiceParent(sm)
+    c = component.IService(bs)
+    c.setServiceParent(sm)
+    c.hide_nodes = config["hide-nodes"]
 
     bsc = b.PublishService()
     bsc.setServiceParent(bs)

@@ -14,7 +14,10 @@ class Options(usage.Options):
 		('dbname', None, 'pubsub'),
 	]
 
-	optFlags = [('verbose', 'v', 'Show traffic')]
+	optFlags = [
+		('verbose', 'v', 'Show traffic'),
+		('hide-nodes', None, 'Hide all nodes for disco')
+	]
 	
 	def postOptions(self):
 		if self['backend'] not in ['pgsql', 'memory']:
