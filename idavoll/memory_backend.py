@@ -87,13 +87,16 @@ class BackendService(backend.BackendService):
                 item.children = []
 
         self.dispatch({ 'items': items, 'node_id': node_id },
-                             '//event/pubsub/notify')
+                      '//event/pubsub/notify')
         return defer.succeed(None)
 
     def get_notification_list(self, node_id, items):
+        subscriptions = self.nodes[node_id].subscriptions
         
         try:
-            d = defer.succeed(self.nodes[node_id].subscriptions.keys())
+            subscribers = [s for s in subscriptions
+                             if subscriptions[s].state == 'subscribed']
+            d = defer.succeed(subscribers)
         except:
             d = defer.fail()
 
@@ -137,6 +140,22 @@ class BackendService(backend.BackendService):
                 'jid': subscriber,
                 'subscription': subscription.state})
     
+    def unsubscribe(self, node_id, subscriber, requestor):
+        try:
+            node = self.nodes[node_id]
+        except KeyError:
+            raise backend.NodeNotFound
+
+        if subscriber.userhostJID() != requestor:
+            raise backend.NotAuthorized
+
+        try:
+            del node.subscriptions[subscriber.full()]
+        except KeyError:
+            raise backend.NotSubscribed
+
+        return defer.succeed(None)
+
     def store_items(self, node_id, items, publisher):
         for item in items:
             self.nodes[node_id].items[item["id"]] = item
@@ -171,7 +190,7 @@ class SubscriptionService(service.Service):
         return self.parent.subscribe(node_id, subscriber, requestor)
 
     def unsubscribe(self, node_id, subscriber, requestor):
-        raise backend.NotImplemented
+        return self.parent.unsubscribe(node_id, subscriber, requestor)
 
 class PersistenceService(service.Service):
 
