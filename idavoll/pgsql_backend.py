@@ -23,8 +23,8 @@ class Storage:
                           WHERE node=%s""",
                        (node_id,))
         try:
-            (configuration["persist_items"],
-             configuration["deliver_payloads"]) = cursor.fetchone()
+            (configuration["pubsub#persist_items"],
+             configuration["pubsub#deliver_payloads"]) = cursor.fetchone()
             return configuration
         except TypeError:
             raise backend.NodeNotFound
@@ -327,6 +327,20 @@ class Storage:
 
         cursor.execute("""DELETE FROM nodes WHERE node=%s""",
                        (node_id.encode('utf-8'),))
+
+    def set_node_configuration(self, node_id, options):
+        return self.dbpool.runInteraction(self._set_node_configuration,
+                                          node_id,
+                                          options)
+
+    def _set_node_configuration(self, cursor, node_id, options):
+        cursor.execute("""UPDATE nodes SET persistent=%s, deliver_payload=%s
+                          WHERE node=%s""",
+                       (options["pubsub#persist_items"].encode('utf8'),
+                        options["pubsub#deliver_payloads"].encode('utf8'),
+                        node_id.encode('utf-8')))
+        if cursor.rowcount != 1:
+            raise backend.Error
 
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """

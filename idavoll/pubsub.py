@@ -11,20 +11,25 @@ NS_COMPONENT = 'jabber:component:accept'
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 NS_PUBSUB_EVENT = NS_PUBSUB + '#event'
 NS_PUBSUB_ERRORS = NS_PUBSUB + '#errors'
+NS_PUBSUB_OWNER = NS_PUBSUB + "#owner"
+NS_X_DATA = 'jabber:x:data'
 
 IQ_GET = '/iq[@type="get"]'
 IQ_SET = '/iq[@type="set"]'
 PUBSUB_ELEMENT = '/pubsub[@xmlns="' + NS_PUBSUB + '"]'
+PUBSUB_OWNER_ELEMENT = '/pubsub[@xmlns="' + NS_PUBSUB_OWNER + '"]'
 PUBSUB_GET = IQ_GET + PUBSUB_ELEMENT
 PUBSUB_SET = IQ_SET + PUBSUB_ELEMENT
+PUBSUB_OWNER_GET = IQ_GET + PUBSUB_OWNER_ELEMENT
+PUBSUB_OWNER_SET = IQ_SET + PUBSUB_OWNER_ELEMENT
 PUBSUB_CREATE = PUBSUB_SET + '/create'
 PUBSUB_PUBLISH = PUBSUB_SET + '/publish'
 PUBSUB_SUBSCRIBE = PUBSUB_SET + '/subscribe'
 PUBSUB_UNSUBSCRIBE = PUBSUB_SET + '/unsubscribe'
 PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
-PUBSUB_CONFIGURE_GET = PUBSUB_GET + '/configure'
-PUBSUB_CONFIGURE_SET = PUBSUB_SET + '/configure'
+PUBSUB_CONFIGURE_GET = PUBSUB_OWNER_GET + '/configure'
+PUBSUB_CONFIGURE_SET = PUBSUB_OWNER_SET + '/configure'
 PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
 PUBSUB_ITEMS = PUBSUB_GET + '/items'
 PUBSUB_RETRACT = PUBSUB_SET + '/retract'
@@ -92,7 +97,11 @@ class Service(component.Service):
     def success(self, result, iq):
         iq.swapAttributeValues("to", "from")
         iq["type"] = 'result'
-        iq.children = result or []
+        iq.children = []
+        if result:
+            for child in result:
+                iq.addChild(child)
+
         return iq
 
     def handler_wrapper(self, handler, iq):
@@ -280,6 +289,7 @@ class ComponentServiceFromNodeCreationService(Service):
 
         if not node:
             info.append(disco.Feature(NS_PUBSUB + "#create-nodes"))
+            info.append(disco.Feature(NS_PUBSUB + "#config-node"))
 
             if self.backend.supports_instant_nodes():
                 info.append(disco.Feature(NS_PUBSUB + "#instant-nodes"))
@@ -295,10 +305,10 @@ class ComponentServiceFromNodeCreationService(Service):
         owner = jid.JID(iq["from"]).userhostJID()
 
         d = self.backend.create_node(node, owner)
-        d.addCallback(self.return_create_response, iq)
+        d.addCallback(self._return_create_response, iq)
         return d
 
-    def return_create_response(self, result, iq):
+    def _return_create_response(self, result, iq):
         node_id = iq.pubsub.create.getAttribute("node")
         if not node_id or node_id != result:
             reply = domish.Element((NS_PUBSUB, 'pubsub'))
@@ -310,13 +320,79 @@ class ComponentServiceFromNodeCreationService(Service):
         self.handler_wrapper(self._onConfigureGet, iq)
 
     def _onConfigureGet(self, iq):
-        raise NodeNotConfigurable
+        try:
+            node_id = iq.pubsub.configure["node"]
+        except KeyError:
+            raise NodeNotConfigurable
+
+        d = self.backend.get_node_configuration(node_id)
+        d.addCallback(self._return_configuration_response, node_id)
+        return d
+
+    def _return_configuration_response(self, options, node_id):
+        reply = domish.Element((NS_PUBSUB_OWNER, "pubsub"))
+        configure = reply.addElement("configure")
+        if node_id:
+            configure["node"] = node_id
+        form = configure.addElement((NS_X_DATA, "x"))
+        form["type"] = "form"
+        field = form.addElement("field")
+        field["var"] = "FORM_TYPE"
+        field["type"] = "hidden"
+        field.addElement("value", content=NS_PUBSUB + "#node_config")
+
+        for option in options:
+            field = form.addElement("field")
+            field["var"] = option["var"]
+            field["type"] = option["type"]
+            field["label"] = option["label"]
+            field.addElement("value", content=option["value"])
+
+        return [reply]
 
     def onConfigureSet(self, iq):
         self.handler_wrapper(self._onConfigureSet, iq)
 
     def _onConfigureSet(self, iq):
-        raise NodeNotConfigurable
+        try:
+            node_id = iq.pubsub.configure["node"]
+        except KeyError:
+            raise BadRequest
+
+        requestor = jid.JID(iq["from"]).userhostJID()
+
+        for element in iq.pubsub.configure.elements():
+            if element.name != 'x' or element.uri != NS_X_DATA:
+                continue
+
+            type = element.getAttribute("type")
+            if type == "cancel":
+                return None
+            elif type != "submit":
+                continue
+
+            try:
+                options = self._get_form_options(element)
+            except:
+                raise BadRequest
+
+            if options["FORM_TYPE"] == NS_PUBSUB + "#node_config":
+                del options["FORM_TYPE"]
+                return self.backend.set_node_configuration(node_id,
+                                                           options,
+                                                           requestor)
+        
+        raise BadRequest
+
+    def _get_form_options(self, form):
+        options = {}
+
+        for element in form.elements():
+            if element.name == 'field' and element.uri == NS_X_DATA:
+                options[element["var"]] = str(element.value)
+
+        print options
+        return options
 
 components.registerAdapter(ComponentServiceFromNodeCreationService, backend.INodeCreationService, component.IService)
 

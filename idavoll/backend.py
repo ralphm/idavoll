@@ -205,8 +205,8 @@ class PublishService(service.Service):
 
     def _do_publish(self, result, node_id, items, requestor):
         configuration = result[0][1]
-        persist_items = configuration["persist_items"]
-        deliver_payloads = configuration["deliver_payloads"]
+        persist_items = configuration["pubsub#persist_items"]
+        deliver_payloads = configuration["pubsub#deliver_payloads"]
         affiliation = result[1][1]
 
         if affiliation not in ['owner', 'publisher']:
@@ -307,6 +307,14 @@ class NodeCreationService(service.Service):
 
     __implements__ = INodeCreationService,
 
+    options = {"pubsub#persist_items":
+                  {"type": "boolean",
+                   "label": "Persist items to storage"},
+               "pubsub#deliver_payloads":
+                  { "type": "boolean",
+                   "label": "Deliver payloads with event notifications"}
+              }
+
     def supports_instant_nodes(self):
         return True
 
@@ -318,6 +326,44 @@ class NodeCreationService(service.Service):
         d = self.parent.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
         return d
+
+    def get_node_configuration(self, node_id):
+        if node_id:
+            d = self.parent.storage.get_node_configuration(node_id)
+        else:
+            d = defer.succeed({"pubsub#persist_items": True,
+                               "pubsub#deliver_payloads": True})
+
+        d.addCallback(self._make_config)
+        return d
+
+    def _make_config(self, config):
+        options = []
+        for key, value in config.iteritems():
+            option = {"var": key}
+            option.update(self.options[key])
+            if option["type"] == "boolean":
+                option["value"] = str(int(bool(value)))
+            else:
+                option["value"] = str(value)
+            options.append(option)
+
+        return options
+
+    def set_node_configuration(self, node_id, options, requestor):
+        for key in options.iterkeys():
+            if not self.options.has_key(key):
+                raise InvalidConfigurationOption
+
+        d = self.parent.storage.get_affiliation(node_id, requestor)
+        d.addCallback(self._do_set_node_configuration, node_id, options)
+        return d
+
+    def _do_set_node_configuration(self, affiliation, node_id, options):
+        if affiliation != 'owner':
+            raise NotAuthorized
+
+        return self.parent.storage.set_node_configuration(node_id, options)
 
 class AffiliationsService(service.Service):
 
