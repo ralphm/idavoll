@@ -275,3 +275,40 @@ class NodeCreationService(service.Service):
         d = self.parent.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
         return d
+
+class AffiliationsService(service.Service):
+
+    __implements__ = IAffiliationsService,
+
+    def get_affiliations(self, entity):
+        d1 = self.parent.storage.get_affiliations(entity)
+        d2 = self.parent.storage.get_subscriptions(entity)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addErrback(lambda x: x.value[0])
+        d.addCallback(self._affiliations_result, entity)
+        return d
+
+    def _affiliations_result(self, result, entity):
+        affiliations = result[0][1]
+        subscriptions = result[1][1]
+
+        new_affiliations = {}
+
+        for node, affiliation in affiliations:
+            new_affiliations[(node, entity.full())] = {'node': node,
+                                                'jid': entity,
+                                                'affiliation': affiliation,
+                                                'subscription': None
+                                               }
+
+        for node, subscriber, subscription in subscriptions:
+            key = node, subscriber.full()
+            if new_affiliations.has_key(key):
+                new_affiliations[key]['subscription'] = subscription
+            else:
+                new_affiliations[key] = {'node': node,
+                                         'jid': subscriber,
+                                         'affiliation': None,
+                                         'subscription': subscription}
+
+        return new_affiliations.values()
