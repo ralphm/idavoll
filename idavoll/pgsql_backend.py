@@ -215,6 +215,13 @@ class Storage:
         return [(node, jid.JID('%s/%s' % (subscriber, resource)), subscription)
                 for node, subscriber, resource, subscription in subscriptions]
 
+    def get_node_type(self, node_id):
+        return self.dbpool.runInteraction(self._get_node_type, node_id)
+    
+    def _get_node_type(self, cursor, node_id):
+        self._check_node_exists(cursor, node_id)
+        return 'leaf'
+
 class BackendService(backend.BackendService):
     """ PostgreSQL backend Service for a JEP-0060 pubsub service """
 
