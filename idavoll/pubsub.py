@@ -167,7 +167,6 @@ class ComponentServiceFromNotificationService(Service):
         d.addCallback(self._notify, node_id)
 
     def _notify(self, list, node_id):
-        print list
         for recipient, items in list.items():
             self._notify_recipient(recipient, node_id, items)
 
@@ -206,8 +205,6 @@ class ComponentServiceFromPublishService(Service):
         for child in iq.pubsub.publish.children:
             if child.__class__ == domish.Element and child.name == 'item':
                 items.append(child)
-
-        print items
 
         return self.backend.publish(node, items,
                                     jid.JID(iq["from"]).userhostJID())
@@ -395,7 +392,6 @@ class ComponentServiceFromNodeCreationService(Service):
             if element.name == 'field' and element.uri == NS_X_DATA:
                 options[element["var"]] = str(element.value)
 
-        print options
         return options
 
 components.registerAdapter(ComponentServiceFromNodeCreationService, backend.INodeCreationService, component.IService)
@@ -473,11 +469,8 @@ class ComponentServiceFromItemRetrievalService(Service):
         reply = domish.Element((NS_PUBSUB, 'pubsub'))
         items = reply.addElement('items')
         items["node"] = node_id
-        try:
-            for r in result:
-                items.addRawXml(r)
-        except Exception, e:
-            print e
+        for r in result:
+            items.addRawXml(r)
 
         return [reply]
 
@@ -513,8 +506,6 @@ class ComponentServiceFromRetractionService(Service):
                     item_ids.append(child["id"])
                 except KeyError:
                     raise BadRequest
-
-        print item_ids
 
         return self.backend.retract_item(node, item_ids,
                                     jid.JID(iq["from"]).userhostJID())
@@ -560,7 +551,6 @@ class ComponentServiceFromNodeDeletionService(Service):
 
         for subscriber in subscribers:
             message["to"] = subscriber
-            print message.toXml()
             self.send(message)
 
     def onDelete(self, iq):

@@ -217,8 +217,6 @@ class PublishService(service.Service):
         elif not items and (persist_items or deliver_payloads):
             raise PayloadExpected
 
-        print "publish by %s to %s" % (requestor.full(), node_id)
-
         if persist_items or deliver_payloads:
             for item in items:
                 if not item.getAttribute("id"):
@@ -412,18 +410,11 @@ class ItemRetrievalService(service.Service):
         return d
 
     def _do_get_items(self, result, node_id, max_items, item_ids):
-        def q(r):
-            print r
-            return r
-
         if not result:
             raise NotAuthorized
 
         if item_ids:
-            d = self.parent.storage.get_items_by_ids(node_id, item_ids)
-            d.addCallback(q)
-            d.addErrback(q)
-            return d
+            return self.parent.storage.get_items_by_ids(node_id, item_ids)
         else:
             return self.parent.storage.get_items(node_id, max_items)
 

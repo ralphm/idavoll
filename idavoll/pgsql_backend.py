@@ -177,17 +177,14 @@ class Storage:
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
                            (owner.full().encode('utf8')))
 
-        try:
-            cursor.execute("""INSERT INTO affiliations
-                              (node_id, entity_id, affiliation)
-                              SELECT n.id, e.id, 'owner' FROM
-                              (SELECT id FROM nodes WHERE node=%s) AS n
-                              CROSS JOIN
-                              (SELECT id FROM entities WHERE jid=%s) AS e""",
-                           (node_id.encode('utf8'),
-                            owner.full().encode('utf8')))
-        except Exception, e:
-            print e
+        cursor.execute("""INSERT INTO affiliations
+                          (node_id, entity_id, affiliation)
+                          SELECT n.id, e.id, 'owner' FROM
+                          (SELECT id FROM nodes WHERE node=%s) AS n
+                          CROSS JOIN
+                          (SELECT id FROM entities WHERE jid=%s) AS e""",
+                       (node_id.encode('utf8'),
+                        owner.full().encode('utf8')))
 
         return None
 
@@ -276,15 +273,12 @@ class Storage:
         query = """SELECT data FROM nodes JOIN items ON
                    (nodes.id=items.node_id)
                    WHERE node=%s ORDER BY date DESC"""
-        try:
-            if max_items:
-                cursor.execute(query + " LIMIT %s",
-                               (node_id.encode('utf8'),
-                                max_items))
-            else:
-                cursor.execute(query, (node_id.encode('utf8')))
-        except Exception, e:
-            print e
+        if max_items:
+            cursor.execute(query + " LIMIT %s",
+                           (node_id.encode('utf8'),
+                            max_items))
+        else:
+            cursor.execute(query, (node_id.encode('utf8')))
 
         result = cursor.fetchall()
         return [r[0] for r in result]
