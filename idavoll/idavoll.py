@@ -1,6 +1,7 @@
 from twisted.protocols.jabber import component
 from twisted.application import service
 from twisted.python import components
+from twisted.internet import defer
 import backend
 import pubsub
 import xmpp_error
@@ -34,7 +35,7 @@ class IdavollService(component.Service):
         if not node:
             features.extend([NS_DISCO_ITEMS, NS_VERSION])
 
-        return features
+        return defer.succeed(features)
     
     def onVersion(self, iq):
         iq.swapAttributeValues("to", "from")
@@ -45,19 +46,43 @@ class IdavollService(component.Service):
         iq.handled = True
 
     def onDiscoInfo(self, iq):
-        identities = []
-        features = []
+        identities_deferreds = []
+        features_deferreds = []
         node = iq.query.getAttribute("node")
 
         for c in self.parent:
             if components.implements(c, component.IService):
                 if hasattr(c, "getIdentities"):
-                    identities.extend(c.getIdentities(node))
+                    identities_deferreds.append(c.getIdentities(node))
                 if hasattr(c, "getFeatures"):
-                    features.extend(c.getFeatures(node))
+                    features_deferreds.append(c.getFeatures(node))
+        print identities_deferreds
+        print features_deferreds
+        d1 = defer.DeferredList(identities_deferreds, fireOnOneErrback=1)
+        d2 = defer.DeferredList(features_deferreds, fireOnOneErrback=1)
+        d = defer.DeferredList([d1, d2], fireOnOneErrback=1)
+        d.addCallback(self._disco_info_results, iq, node)
+        d.addErrback(self._disco_info_error, iq)
+        d.addCallback(self.q)
+        d.addCallback(self.send)
+
+        iq.handled = True
+
+    def q(self, result):
+        print result
+        return result
+
+    def _disco_info_results(self, results, iq, node):
+        identities = []
+        for i in results[0][1]:
+            identities.extend(i[1])
+
+        features = []
+        for f in results[1][1]:
+            features.extend(f[1])
 
         if node and not features and not identities:
-            xmpp_error.error_from_iq(iq, 'item-not-found')
+            return xmpp_error.error_from_iq(iq, 'item-not-found')
         else:
             iq.swapAttributeValues("to", "from")
             iq["type"] = "result"
@@ -69,8 +94,11 @@ class IdavollService(component.Service):
                 f = iq.query.addElement("feature")
                 f["var"] = feature
 
-        self.send(iq)
-        iq.handled = True
+
+        return iq
+
+    def _disco_info_error(self, results, iq):
+        return xmpp_error.error_from_iq(iq, 'internal-error')
 
     def onDiscoItems(self, iq):
         iq.swapAttributeValues("to", "from")
