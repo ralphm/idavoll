@@ -79,7 +79,7 @@ class Storage:
 
     def _store_item(self, cursor, node_id, item, publisher):
         data = item.toXml()
-        cursor.execute("""UPDATE items SET publisher=%s, data=%s
+        cursor.execute("""UPDATE items SET date=now(), publisher=%s, data=%s
                           FROM nodes
                           WHERE nodes.id = items.node_id AND
                                 nodes.node = %s and items.item=%s""",
