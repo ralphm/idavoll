@@ -125,14 +125,15 @@ class ComponentServiceFromService(Service):
     def getFeatures(self, node):
         features = []
 
-        affiliations = self.backend.get_supported_affiliations()
-        if 'outcast' in affiliations:
-            features.append("http://jabber.org/protocol/pubsub#outcast-affil")
+        if not node:
+            if self.backend.supports_publisher_affiliation():
+                features.append(NS_PUBSUB + "#publisher-affiliation")
 
-        if 'publisher' in affiliations:
-            features.append("http://jabber.org/protocol/pubsub#publisher-affil")
+            if self.backend.supports_outcast_affiliation():
+                features.append(NS_PUBSUB + "#outcast-affiliation")
 
-        # "http://jabber.org/protocol/pubsub#persistent-items"
+            if self.backend.supports_persistent_items():
+                features.append(NS_PUBSUB + "#persistent-items")
 
         return features
 
@@ -253,6 +254,17 @@ components.registerAdapter(ComponentServiceFromSubscriptionService, backend.ISub
 
 class ComponentServiceFromNodeCreationService(Service):
 
+    def getFeatures(self, node):
+        features = []
+
+        if not node:
+            features.append(NS_PUBSUB + "#create-nodes")
+
+            if self.backend.supports_instant_nodes():
+                features.append(NS_PUBSUB + "#instant-nodes")
+
+        return features
+
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_CREATE, self.onCreate)
         xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
@@ -265,7 +277,8 @@ class ComponentServiceFromNodeCreationService(Service):
         if iq.pubsub.options:
             raise CreateNodeNotConfigurable
 
-        node = iq.pubsub.create["node"]
+        node = iq.pubsub.create.getAttribute("node")
+
         owner = jid.JID(iq["from"]).userhostJID()
 
         d = self.backend.create_node(node, owner)
