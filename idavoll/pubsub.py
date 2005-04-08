@@ -5,6 +5,7 @@ from twisted.internet import defer
 from zope.interface import implements
 
 import backend
+import storage
 import xmpp_error
 import disco
 import data_form
@@ -57,14 +58,17 @@ class NodeNotConfigurable(Error):
     pubsub_error = 'node-not-configurable'
 
 error_map = {
-    backend.NotAuthorized:      ('not-authorized', None),
-    backend.NodeNotFound:       ('item-not-found', None),
-    backend.NoPayloadAllowed:   ('bad-request', None),
-    backend.PayloadExpected:    ('bad-request', None),
-    backend.NoInstantNodes:     ('not-acceptable', None),
-    backend.NodeExists:         ('conflict', None),
-    backend.NotImplemented:     ('feature-not-implemented', None),
-    backend.NotSubscribed:      ('not-authorized', 'requestor-not-subscribed'),
+    storage.NodeNotFound: ('item-not-found', None),
+    storage.NodeExists: ('conflict', None),
+
+    backend.NotAuthorized: ('not-authorized', None),
+    backend.NoPayloadAllowed: ('bad-request', None),
+    backend.PayloadExpected: ('bad-request', None),
+    backend.NoInstantNodes: ('not-acceptable', None),
+    backend.NotImplemented: ('feature-not-implemented', None),
+    backend.NotSubscribed: ('not-authorized', 'requestor-not-subscribed'),
+    backend.InvalidConfigurationOption: ('not-acceptable', None),
+    backend.InvalidConfigurationValue: ('not-acceptable', None),
 }
 
 class Service(component.Service):
@@ -111,6 +115,7 @@ class Service(component.Service):
         except:
             d = defer.fail()
 
+
         d.addCallback(self.success, iq)
         d.addErrback(self.error, iq)
         d.addCallback(self.send)
@@ -144,7 +149,7 @@ class ComponentServiceFromService(Service):
                 d = self.backend.get_node_type(node)
                 d.addCallback(self._add_identity, [], node)
                 d.addErrback(lambda _: [])
-            except backend.NodeNotFound:
+            except storage.NodeNotFound:
                 return defer.succeed([])
             return d
 
@@ -188,13 +193,13 @@ class ComponentServiceFromNotificationService(Service):
         d.addCallback(self._notify, node_id)
 
     def _notify(self, list, node_id):
-        for recipient, items in list.items():
+        for recipient, items in list:
             self._notify_recipient(recipient, node_id, items)
 
     def _notify_recipient(self, recipient, node_id, itemlist):
         message = domish.Element((NS_COMPONENT, "message"))
         message["from"] = self.parent.jabberId
-        message["to"] = recipient
+        message["to"] = recipient.full()
         event = message.addElement((NS_PUBSUB_EVENT, "event"))
         items = event.addElement("items")
         items["node"] = node_id
@@ -220,7 +225,10 @@ class ComponentServiceFromPublishService(Service):
         self.handler_wrapper(self._onPublish, iq)
 
     def _onPublish(self, iq):
-        node = iq.pubsub.publish["node"]
+        try:
+            node = iq.pubsub.publish["node"]
+        except KeyError:
+            raise BadRequest
 
         items = []
         for child in iq.pubsub.publish.children:
@@ -362,6 +370,7 @@ class ComponentServiceFromNodeCreationService(Service):
         for option in options:
             form.add_field_single(**option)
 
+        form.parent = configure
         configure.addChild(form)
 
         return [reply]
@@ -378,7 +387,7 @@ class ComponentServiceFromNodeCreationService(Service):
         requestor = jid.JID(iq["from"]).userhostJID()
 
         for element in iq.pubsub.configure.elements():
-            if element.name != 'x' or element.uri != NS_X_DATA:
+            if element.name != 'x' or element.uri != data_form.NS_X_DATA:
                 continue
 
             type = element.getAttribute("type")
@@ -387,10 +396,7 @@ class ComponentServiceFromNodeCreationService(Service):
             elif type != "submit":
                 continue
 
-            try:
-                options = self._get_form_options(element)
-            except:
-                raise BadRequest
+            options = self._get_form_options(element)
 
             if options["FORM_TYPE"] == NS_PUBSUB + "#node_config":
                 del options["FORM_TYPE"]
@@ -404,8 +410,11 @@ class ComponentServiceFromNodeCreationService(Service):
         options = {}
 
         for element in form.elements():
-            if element.name == 'field' and element.uri == NS_X_DATA:
-                options[element["var"]] = str(element.value)
+            if element.name == 'field' and element.uri == data_form.NS_X_DATA:
+                try:
+                    options[element["var"]] = str(element.value)
+                except (KeyError, AttributeError):
+                    raise BadRequest
 
         return options
 
