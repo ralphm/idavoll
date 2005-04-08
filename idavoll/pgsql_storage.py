@@ -40,18 +40,20 @@ class Storage:
         return self._dbpool.runInteraction(self._create_node, node_id, owner)
 
     def _create_node(self, cursor, node_id, owner):
+        node_id = node_id.encode('utf-8')
+        owner = owner.userhost().encode('utf-8')
         try:
             cursor.execute("""INSERT INTO nodes (node) VALUES (%s)""",
-                           (node_id.encode('utf8')))
-        except:
+                           (node_id))
+        except cursor._pool.dbapi.OperationalError:
             raise storage.NodeExists
        
         cursor.execute("""SELECT 1 from entities where jid=%s""",
-                       (owner.full().encode('utf8')))
+                       (owner))
 
         if not cursor.fetchone():
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                           (owner.full().encode('utf8')))
+                           (owner))
 
         cursor.execute("""INSERT INTO affiliations
                           (node_id, entity_id, affiliation)
@@ -59,8 +61,7 @@ class Storage:
                           (SELECT id FROM nodes WHERE node=%s) AS n
                           CROSS JOIN
                           (SELECT id FROM entities WHERE jid=%s) AS e""",
-                       (node_id.encode('utf8'),
-                        owner.full().encode('utf8')))
+                       (node_id, owner))
 
     def delete_node(self, node_id):
         return self._dbpool.runInteraction(self._delete_node, node_id)
@@ -79,7 +80,7 @@ class Storage:
                                         JOIN nodes ON
                                         (nodes.id=affiliations.node_id)
                                         WHERE jid=%s""",
-                                     (entity.full().encode('utf8'),))
+                                     (entity.userhost().encode('utf8'),))
         d.addCallback(lambda results: [tuple(r) for r in results])
         return d
 
@@ -141,7 +142,7 @@ class Node:
                           JOIN entities ON (entity_id=entities.id)
                           WHERE node=%s AND jid=%s""",
                        (self.id.encode('utf8'),
-                        entity.full().encode('utf8')))
+                        entity.userhost().encode('utf8')))
 
         try:
             return cursor.fetchone()[0]
@@ -159,7 +160,7 @@ class Node:
         try:
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
                            (userhost.encode('utf8')))
-        except:
+        except cursor._pool.dbapi.OperationalError:
             pass
 
         try:
@@ -173,7 +174,7 @@ class Node:
                             state.encode('utf8'),
                             self.id.encode('utf8'),
                             userhost.encode('utf8')))
-        except:
+        except cursor._pool.dbapi.OperationalError:
             cursor.execute("""SELECT subscription FROM subscriptions
                               JOIN nodes ON (nodes.id=subscriptions.node_id)
                               JOIN entities ON
