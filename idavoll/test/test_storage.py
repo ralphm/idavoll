@@ -9,6 +9,14 @@ SUBSCRIBER = jid.JID('subscriber@example.com/Home')
 
 class StorageTests:
 
+    def _assignTestNode(self, node):
+        self.node = node
+
+    def setUpClass(self):
+        d = self.s.get_node('pre-existing')
+        d.addCallback(self._assignTestNode)
+        return d
+
     def testGetNode(self):
         return self.s.get_node('pre-existing')
 
@@ -69,22 +77,52 @@ class StorageTests:
         d.addCallback(cb)
         return d
 
+    # Node tests
+
+    def testGetType(self):
+        assertEqual(self.node.get_type(), 'leaf')
+
+    def testGetConfiguration(self):
+        config = self.node.get_configuration()
+        assertIn('pubsub#persist_items', config.iterkeys())
+        assertIn('pubsub#deliver_payloads', config.iterkeys())
+        assertEqual(config['pubsub#persist_items'], True)
+        assertEqual(config['pubsub#deliver_payloads'], True)
+
+    def testGetMetaData(self):
+        meta_data = self.node.get_meta_data()
+        for key, value in self.node.get_configuration().iteritems():
+            assertIn(key, meta_data.iterkeys())
+            assertEqual(value, meta_data[key])
+        assertIn('pubsub#node_type', meta_data.iterkeys())
+        assertEqual(meta_data['pubsub#node_type'], 'leaf')
+
+
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUpClass(self):
-        from idavoll.memory_storage import Storage, LeafNode, Subscription
+        from idavoll.memory_storage import Storage, LeafNode, Subscription, \
+                                           default_config
         self.s = Storage()
-        self.s._nodes['pre-existing'] = LeafNode('pre-existing', OWNER, None)
+        self.s._nodes['pre-existing'] = LeafNode('pre-existing', OWNER,
+                                                 default_config)
         self.s._nodes['to-be-deleted'] = LeafNode('to-be-deleted', OWNER, None)
         self.s._nodes['pre-existing']._subscriptions[SUBSCRIBER.full()] = \
                 Subscription('subscribed')
 
+        return StorageTests.setUpClass(self)
+
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
+    def _callSuperSetUpClass(self, void):
+        return StorageTests.setUpClass(self)
+
     def setUpClass(self):
         from idavoll.pgsql_storage import Storage
         self.s = Storage('ralphm', 'pubsub_test')
         self.s._dbpool.start()
-        return self.s._dbpool.runInteraction(self.init)
+        d = self.s._dbpool.runInteraction(self.init)
+        d.addCallback(self._callSuperSetUpClass)
+        return d
 
     def tearDownClass(self):
         return self.s._dbpool.runInteraction(self.cleandb)
@@ -113,7 +151,8 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
     
     def cleandb(self, cursor):
         cursor.execute("""DELETE FROM nodes WHERE node in
-                          ('pre-existing', 'new 1', 'new 2', 'new 3')""")
+                          ('non-existing', 'pre-existing', 'to-be-deleted',
+                           'new 1', 'new 2', 'new 3')""")
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        OWNER.userhost().encode('utf-8'))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
