@@ -4,8 +4,8 @@ from twisted.internet import defer
 from twisted.words.protocols.jabber import jid
 import storage
 
-default_config = {"pubsub#persist_items": False,
-                  "pubsub#deliver_payloads": False}
+default_config = {"pubsub#persist_items": True,
+                  "pubsub#deliver_payloads": True}
 
 class Storage:
 
