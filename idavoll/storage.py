@@ -84,13 +84,28 @@ class IStorage(Interface):
 class INode(Interface):
     """ """
     def get_type(self):
-        """ """
+        """ Get node's type.
+        
+        @return: C{'leaf'} or C{'collection'}.
+        """
 
     def get_configuration(self):
-        """ """
+        """ Get node's configuration.
+
+        The configuration must at least have two options:
+        C{pubsub#persist_items}, and C{pubsub#deliver_payloads}.
+
+        @return: L{dict} of configuration options.
+        """
 
     def get_meta_data(self):
-        """ """
+        """ Get node's meta data.
+
+        The meta data must be a superset of the configuration options, and
+        also at least should have a C{pubsub#node_type} entry.
+
+        @return: L{dict} of meta data.
+        """
 
     def set_configuration(self, options):
         """ """
