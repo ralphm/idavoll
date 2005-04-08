@@ -141,8 +141,8 @@ class ComponentServiceFromService(Service):
         else:
             try:
                 d = self.backend.get_node_type(node)
-                d.addErrback(lambda _: [])
                 d.addCallback(self._add_identity, [], node)
+                d.addErrback(lambda _: [])
             except backend.NodeNotFound:
                 return defer.succeed([])
             return d
