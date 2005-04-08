@@ -1,9 +1,8 @@
 from twisted.words.protocols.jabber import jid
-from twisted.python import components
 from twisted.application import service
 from twisted.xish import utility
 from twisted.internet import defer
-from zope.interface import implements
+from zope.interface import Interface, implements
 import sha
 import time
 
@@ -37,7 +36,7 @@ class NotImplemented(Error):
 class NotSubscribed(Error):
     pass
 
-class IBackendService(components.Interface):
+class IBackendService(Interface):
     """ Interface to a backend service of a pubsub service. """
 
     def get_supported_affiliations(self):
@@ -46,7 +45,7 @@ class IBackendService(components.Interface):
         @return: a list of supported affiliation types.
         """
 
-class INodeCreationService(components.Interface):
+class INodeCreationService(Interface):
     """ A service for creating nodes """
 
     def create_node(self, node_id, requestor):
@@ -55,7 +54,7 @@ class INodeCreationService(components.Interface):
         @return: a deferred that fires when the node has been created.
         """
 
-class INodeDeletionService(components.Interface):
+class INodeDeletionService(Interface):
     """ A service for deleting nodes. """
 
     def register_pre_delete(self, pre_delete_fn):
@@ -89,7 +88,7 @@ class INodeDeletionService(components.Interface):
         @return: a deferred that fires when the node has been deleted.
         """
 
-class IPublishService(components.Interface):
+class IPublishService(Interface):
     """ A service for publishing items to a node. """
 
     def publish(self, node_id, items, requestor):
@@ -97,7 +96,7 @@ class IPublishService(components.Interface):
         
         @return: a deferred that fires when the items have been published.
         """
-class INotificationService(components.Interface):
+class INotificationService(Interface):
     """ A service for notification of published items. """
 
     def register_notifier(self, observerfn, *args, **kwargs):
@@ -106,7 +105,7 @@ class INotificationService(components.Interface):
     def get_notification_list(self, node_id, items):
         pass
 
-class ISubscriptionService(components.Interface):
+class ISubscriptionService(Interface):
     """ A service for managing subscriptions. """
 
     def subscribe(self, node_id, subscriber, requestor):
@@ -132,7 +131,7 @@ class ISubscriptionService(components.Interface):
         @return: a deferred that fires when unsubscription is complete.
         """
 
-class IAffiliationsService(components.Interface):
+class IAffiliationsService(Interface):
     """ A service for retrieving the affiliations with this pubsub service. """
 
     def get_affiliations(self, entity):
@@ -146,7 +145,7 @@ class IAffiliationsService(components.Interface):
         and subscriptions.
         """
 
-class IRetractionService(components.Interface):
+class IRetractionService(Interface):
     """ A service for retracting published items """
 
     def retract_item(self, node_id, item_id, requestor):
@@ -155,7 +154,7 @@ class IRetractionService(components.Interface):
     def purge_node(self, node_id, requestor):
         """ Removes all items in node from persistent storage """
 
-class IItemRetrievalService(components.Interface):
+class IItemRetrievalService(Interface):
     """ A service for retrieving previously published items. """
 
     def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
