@@ -49,17 +49,17 @@ class Storage:
         return defer.succeed(None)
 
     def get_affiliations(self, entity):
-        entity_full = entity.full()
-        return defer.succeed([(node.id, node._affiliations[entity_full])
+        entity = entity.userhost()
+        return defer.succeed([(node.id, node._affiliations[entity])
                               for name, node in self._nodes.iteritems()
-                              if entity_full in node._affiliations])
+                              if entity in node._affiliations])
 
     def get_subscriptions(self, entity):
         subscriptions = []
         for node in self._nodes.itervalues():
             for subscriber, subscription in node._subscriptions.iteritems():
                 subscriber = jid.JID(subscriber)
-                if subscriber.userhostJID() == entity:
+                if subscriber.userhostJID() == entity.userhostJID():
                     subscriptions.append((node.id, subscriber,
                                           subscription.state))
 
@@ -71,7 +71,7 @@ class Node:
 
     def __init__(self, node_id, owner, config):
         self.id = node_id
-        self._affiliations = {owner.full(): 'owner'}
+        self._affiliations = {owner.userhost(): 'owner'}
         self._subscriptions = {}
         self._config = config
 
