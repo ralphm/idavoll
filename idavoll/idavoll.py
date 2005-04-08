@@ -139,12 +139,14 @@ def makeService(config):
         LogService().setServiceParent(sm)
 
     if config['backend'] == 'pgsql':
-        import pgsql_backend as b
-        st = b.Storage(user=config['dbuser'], database=config['dbname'])
+        import pgsql_storage
+        st = pgsql_storage.Storage(user=config['dbuser'],
+                                   database=config['dbname'])
     elif config['backend'] == 'memory':
-        import memory_backend as b
-        st = b.Storage()
+        import memory_storage
+        st = memory_storage.Storage()
 
+    import generic_backend as b
     bs = b.BackendService(st)
 
     c = component.IService(bs)
@@ -171,18 +173,17 @@ def makeService(config):
     bsc.setServiceParent(bs)
     component.IService(bsc).setServiceParent(sm)
 
-    if config['backend'] == 'pgsql':
-        bsc = b.ItemRetrievalService()
-        bsc.setServiceParent(bs)
-        component.IService(bsc).setServiceParent(sm)
+    bsc = b.ItemRetrievalService()
+    bsc.setServiceParent(bs)
+    component.IService(bsc).setServiceParent(sm)
 
-        bsc = b.RetractionService()
-        bsc.setServiceParent(bs)
-        component.IService(bsc).setServiceParent(sm)
+    bsc = b.RetractionService()
+    bsc.setServiceParent(bs)
+    component.IService(bsc).setServiceParent(sm)
 
-        bsc = b.NodeDeletionService()
-        bsc.setServiceParent(bs)
-        component.IService(bsc).setServiceParent(sm)
+    bsc = b.NodeDeletionService()
+    bsc.setServiceParent(bs)
+    component.IService(bsc).setServiceParent(sm)
 
     s = IdavollService()
     s.setServiceParent(sm)
