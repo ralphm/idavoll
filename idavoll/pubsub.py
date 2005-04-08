@@ -1,7 +1,8 @@
-from twisted.protocols.jabber import component,jid
+from twisted.words.protocols.jabber import component,jid
 from twisted.xish import utility, domish
 from twisted.python import components
 from twisted.internet import defer
+from zope.interface import implements
 
 import backend
 import xmpp_error
@@ -68,7 +69,7 @@ error_map = {
 
 class Service(component.Service):
 
-    __implements__ = component.IService
+    implements(component.IService)
 
     def __init__(self, backend):
         self.backend = backend

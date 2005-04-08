@@ -1,6 +1,6 @@
 from twisted.application import service
 from twisted.internet import defer
-from twisted.protocols.jabber import jid
+from twisted.words.protocols.jabber import jid
 from twisted.enterprise import adbapi
 import backend
 

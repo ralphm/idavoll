@@ -1,8 +1,9 @@
-from twisted.protocols.jabber import jid
+from twisted.words.protocols.jabber import jid
 from twisted.python import components
 from twisted.application import service
 from twisted.xish import utility
 from twisted.internet import defer
+from zope.interface import implements
 import sha
 import time
 
@@ -169,7 +170,7 @@ class IItemRetrievalService(components.Interface):
 
 class BackendService(service.MultiService, utility.EventDispatcher):
 
-    __implements__ = IBackendService,
+    implements(IBackendService)
 
     options = {"pubsub#persist_items":
                   {"type": "boolean",
@@ -222,7 +223,7 @@ class BackendService(service.MultiService, utility.EventDispatcher):
 
 class PublishService(service.Service):
     
-    __implements__ = IPublishService,
+    implements(IPublishService)
 
     def publish(self, node_id, items, requestor):
         d1 = self.parent.storage.get_node_configuration(node_id)
@@ -270,7 +271,7 @@ class PublishService(service.Service):
 
 class NotificationService(service.Service):
 
-    __implements__ = INotificationService,
+    implements(INotificationService)
 
     def get_notification_list(self, node_id, items):
         d = self.parent.storage.get_subscribers(node_id)
@@ -289,7 +290,7 @@ class NotificationService(service.Service):
 
 class SubscriptionService(service.Service):
 
-    __implements__ = ISubscriptionService,
+    implements(ISubscriptionService)
 
     def subscribe(self, node_id, subscriber, requestor):
         if subscriber.userhostJID() != requestor:
@@ -332,7 +333,7 @@ class SubscriptionService(service.Service):
 
 class NodeCreationService(service.Service):
 
-    __implements__ = INodeCreationService,
+    implements(INodeCreationService)
 
     def supports_instant_nodes(self):
         return True
@@ -384,7 +385,7 @@ class NodeCreationService(service.Service):
 
 class AffiliationsService(service.Service):
 
-    __implements__ = IAffiliationsService,
+    implements(IAffiliationsService)
 
     def get_affiliations(self, entity):
         d1 = self.parent.storage.get_affiliations(entity)
@@ -421,7 +422,7 @@ class AffiliationsService(service.Service):
 
 class ItemRetrievalService(service.Service):
 
-    __implements__ = IItemRetrievalService
+    implements(IItemRetrievalService)
 
     def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
         d = self.parent.storage.is_subscribed(node_id, requestor)
@@ -439,7 +440,7 @@ class ItemRetrievalService(service.Service):
 
 class RetractionService(service.Service):
 
-    __implements__ = IRetractionService,
+    implements(IRetractionService)
                                                                                 
     def retract_item(self, node_id, item_ids, requestor):
         d1 = self.parent.storage.get_node_configuration(node_id)
@@ -496,7 +497,7 @@ class RetractionService(service.Service):
 
 class NodeDeletionService(service.Service):
 
-    __implements__ = INodeDeletionService,
+    implements(INodeDeletionService)
 
     def __init__(self):
         self._callback_list = []

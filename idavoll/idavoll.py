@@ -1,4 +1,4 @@
-from twisted.protocols.jabber import component
+from twisted.words.protocols.jabber import component
 from twisted.application import service
 from twisted.python import components
 from twisted.internet import defer
@@ -49,7 +49,7 @@ class IdavollService(component.Service):
         node = iq.query.getAttribute("node")
 
         for c in self.parent:
-            if components.implements(c, component.IService):
+            if component.IService.providedBy(c):
                 if hasattr(c, "get_disco_info"):
                     dl.append(c.get_disco_info(node))
         d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
@@ -88,7 +88,7 @@ class IdavollService(component.Service):
         node = iq.query.getAttribute("node")
 
         for c in self.parent:
-            if components.implements(c, component.IService):
+            if component.IService.providedBy(c):
                 if hasattr(c, "get_disco_items"):
                     dl.append(c.get_disco_items(node))
         d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
