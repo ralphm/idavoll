@@ -268,14 +268,14 @@ class ComponentServiceFromSubscriptionService(Service):
 
         requestor = jid.JID(iq["from"]).userhostJID()
         d = self.backend.subscribe(node_id, subscriber, requestor)
-        d.addCallback(self.return_subscription)
+        d.addCallback(self.return_subscription, subscriber)
         return d
 
-    def return_subscription(self, result):
+    def return_subscription(self, result, subscriber):
         reply = domish.Element((NS_PUBSUB, "pubsub"))
         entity = reply.addElement("entity")
         entity["node"] = result["node"]
-        entity["jid"] = result["jid"].full()
+        entity["jid"] = subscriber.full()
         entity["affiliation"] = result["affiliation"] or 'none'
         entity["subscription"] = result["subscription"]
         return [reply]
