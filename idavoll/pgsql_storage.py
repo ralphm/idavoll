@@ -120,24 +120,25 @@ class Node:
         return self._config
 
     def set_configuration(self, options):
-        return self._dbpool.runInteraction(self._set_configuration,
-                                           options)
-
-    def _set_configuration(self, cursor, options):
-        self._check_node_exists(cursor)
-
         config = copy.copy(self._config)
 
         for option in options:
             if option in config:
                 config[option] = options[option]
         
+        d = self._dbpool.runInteraction(self._set_configuration, config)
+        d.addCallback(self._set_cached_configuration, config)
+        return d
+
+    def _set_configuration(self, cursor, config):
+        self._check_node_exists(cursor)
         cursor.execute("""UPDATE nodes SET persistent=%s, deliver_payload=%s
                           WHERE node=%s""",
                        (config["pubsub#persist_items"],
                         config["pubsub#deliver_payloads"],
                         self.id.encode('utf-8')))
 
+    def _set_cached_configuration(self, void, config):
         self._config = config
 
     def get_meta_data(self):
