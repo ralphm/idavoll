@@ -96,19 +96,28 @@ class Node:
     def get_affiliation(self, entity):
         return defer.succeed(self._affiliations.get(entity.full()))
 
-    def add_subscription(self, subscriber, state):
+    def get_subscription(self, subscriber):
         try:
             subscription = self._subscriptions[subscriber.full()]
-        except:
-            subscription = Subscription(state)
-            self._subscriptions[subscriber.full()] = subscription
+        except KeyError:
+            state = None
+        else:
+            state = subscription.state
+        return defer.succeed(state)
 
-        return defer.succeed({'node': self.id,
-                              'jid': subscriber,
-                              'subscription': subscription.state})
+    def add_subscription(self, subscriber, state):
+        if self._subscriptions.get(subscriber.full()):
+            return defer.fail(storage.SubscriptionExists())
+        
+        subscription = Subscription(state)
+        self._subscriptions[subscriber.full()] = subscription
+        return defer.succeed(None)
 
     def remove_subscription(self, subscriber):
-        del self._subscriptions[subscriber.full()]
+        try:
+            del self._subscriptions[subscriber.full()]
+        except KeyError:
+            return defer.fail(storage.SubscriptionNotFound())
 
         return defer.succeed(None)
 
