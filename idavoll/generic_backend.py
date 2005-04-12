@@ -153,12 +153,19 @@ class SubscriptionService(service.Service):
             raise backend.NotAuthorized
 
         d = node.add_subscription(subscriber, 'subscribed')
-        d.addCallback(self._return_subscription, affiliation)
+        d.addCallback(lambda _: 'subscribed')
+        d.addErrback(self._get_subscription, node)
+        d.addCallback(self._return_subscription, affiliation, node.id)
         return d
 
-    def _return_subscription(self, result, affiliation):
-        result['affiliation'] = affiliation
-        return result
+    def _get_subscription(self, failure, node):
+        failure.Trap(storage.SubscriptionExists)
+        return node.get_subscription(subscriber)
+
+    def _return_subscription(self, result, affiliation, node_id):
+        return {'affiliation': affiliation,
+                'node': node_id,
+                'state': result}
 
     def unsubscribe(self, node_id, subscriber, requestor):
         if subscriber.userhostJID() != requestor:
