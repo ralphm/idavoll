@@ -112,7 +112,15 @@ class INode(Interface):
         """
 
     def set_configuration(self, options):
-        """ """
+        """ Set node's configuration.
+        
+        The elements of {options} will set the new values for those
+        configuration items. This means that only changing items have to
+        be given.
+
+        @param options: a dictionary of configuration options.
+        @returns: a deferred that fires upon success.
+        """
 
     def get_affiliation(self, entity):
         """ Get affiliation of entity with this node.
