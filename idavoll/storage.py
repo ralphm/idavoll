@@ -7,10 +7,14 @@ class Error(Exception):
 class NodeNotFound(Error):
     pass
 
-
 class NodeExists(Error):
     pass
 
+class SubscriptionNotFound(Error):
+    pass
+
+class SubscriptionExists(Error):
+    pass
 
 class IStorage(Interface):
     """ Storage interface """
@@ -111,20 +115,60 @@ class INode(Interface):
         """ """
 
     def get_affiliation(self, entity):
-        """ """
+        """ Get affiliation of entity with this node.
+
+        @param entity: JID of entity.
+        @type entity: L{jid.JID}
+        @return: deferred that returns C{'owner'}, C{'publisher'}, C{'outcast'}
+                 or C{None}.
+        """
+
+    def get_subscription(self, subscriber):
+        """ Get subscription to this node of subscriber.
+
+        @param subscriber: JID of the new subscriptions' entity.
+        @type subscriber: L{jid.JID}
+        @return: deferred that returns the subscription state (C{'subscribed'},
+                 C{'pending'} or C{None}).
+        """
 
     def add_subscription(self, subscriber, state):
-        """ """
+        """ Add new subscription to this node with given state.
+
+        @param subscriber: JID of the new subscriptions' entity.
+        @type subscriber: L{jid.JID}
+        @param state: C{'subscribed'} or C{'pending'}
+        @type state: L{str}
+        @return: deferred that fires on subscription.
+        """
 
     def remove_subscription(self, subscriber):
-        """ """
+        """ Remove subscription to this node.
+
+        @param subscriber: JID of the subscriptions' entity.
+        @type subscriber: L{jid.JID}
+        @return: deferred that fires on removal.
+        """
 
     def get_subscribers(self):
-        """ """
+        """ Get list of subscribers to this node.
+        
+        Retrieves the list of entities that have a subscription to this
+        node. That is, having the state C{'subscribed'}.
+
+        @return: a deferred that returns a L{list} of L{jid.JID}s.
+        """
 
     def is_subscribed(self, subscriber):
-        """ """
+        """ Returns whether subscriber has a subscription to this node.
+       
+        Only returns C{True} when the subscription state (if present) is
+        C{'subscribed'}.
 
+        @param subscriber: JID of the subscriptions' entity.
+        @type subscriber: L{jid.JID}
+        @return: deferred that returns a L{bool}.
+        """
 
 class ILeafNode(Interface):
     """ """
