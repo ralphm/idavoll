@@ -1,11 +1,15 @@
 from twisted.trial import unittest
 from twisted.trial.assertions import *
 from twisted.words.protocols.jabber import jid
+from twisted.internet import defer
 
 from idavoll import storage
 
 OWNER = jid.JID('owner@example.com')
 SUBSCRIBER = jid.JID('subscriber@example.com/Home')
+SUBSCRIBER_NEW = jid.JID('new@example.com/Home')
+SUBSCRIBER_TO_BE_DELETED = jid.JID('to_be_deleted@example.com/Home')
+SUBSCRIBER_PENDING = jid.JID('pending@example.com/Home')
 
 class StorageTests:
 
@@ -89,6 +93,30 @@ class StorageTests:
         assertEqual(config['pubsub#persist_items'], True)
         assertEqual(config['pubsub#deliver_payloads'], True)
 
+    def testSetConfiguration(self):
+        def get_config(node):
+            d = node.set_configuration({'pubsub#persist_items': False})
+            d.addCallback(lambda _: node)
+            return d
+
+        def check_object_config(node):
+            config = node.get_configuration()
+            assertEqual(config['pubsub#persist_items'], False)
+        
+        def get_node(void):
+            return self.s.get_node('to-be-reconfigured')
+
+        def check_storage_config(node):
+            config = node.get_configuration()
+            assertEqual(config['pubsub#persist_items'], False)
+
+        d = self.s.get_node('to-be-reconfigured')
+        d.addCallback(get_config)
+        d.addCallback(check_object_config)
+        d.addCallback(get_node)
+        d.addCallback(check_storage_config)
+        return d
+
     def testGetMetaData(self):
         meta_data = self.node.get_meta_data()
         for key, value in self.node.get_configuration().iteritems():
@@ -97,6 +125,80 @@ class StorageTests:
         assertIn('pubsub#node_type', meta_data.iterkeys())
         assertEqual(meta_data['pubsub#node_type'], 'leaf')
 
+    def testGetAffiliation(self):
+        def cb(affiliation):
+            assertEqual(affiliation, 'owner')
+
+        d = self.node.get_affiliation(OWNER)
+        d.addCallback(cb)
+        return d
+
+    def testGetNonExistingAffiliation(self):
+        def cb(affiliation):
+            assertEqual(affiliation, None)
+
+        d = self.node.get_affiliation(SUBSCRIBER)
+        d.addCallback(cb)
+        return d
+
+    def testAddSubscription(self):
+        def cb1(void):
+            return self.node.get_subscription(SUBSCRIBER_NEW)
+
+        def cb2(state):
+            assertEqual(state, 'pending')
+
+        d = self.node.add_subscription(SUBSCRIBER_NEW, 'pending')
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        return d
+
+    def testAddExistingSubscription(self):
+        d = self.node.add_subscription(SUBSCRIBER, 'pending')
+        assertFailure(d, storage.SubscriptionExists)
+        return d
+    
+    def testGetSubscription(self):
+        def cb(subscriptions):
+            assertEquals(subscriptions[0][1], 'subscribed')
+            assertEquals(subscriptions[1][1], 'pending')
+            assertEquals(subscriptions[2][1], None)
+
+        d = defer.DeferredList([self.node.get_subscription(SUBSCRIBER),
+                                self.node.get_subscription(SUBSCRIBER_PENDING),
+                                self.node.get_subscription(OWNER)])
+        d.addCallback(cb)
+        return d
+
+    def testRemoveSubscription(self):
+        return self.node.remove_subscription(SUBSCRIBER_TO_BE_DELETED)
+
+    def testRemoveNonExistingSubscription(self):
+        d = self.node.remove_subscription(OWNER)
+        assertFailure(d, storage.SubscriptionNotFound)
+        return d
+    
+    def testGetSubscribers(self):
+        def cb(subscribers):
+            assertIn(SUBSCRIBER, subscribers)
+            assertNotIn(SUBSCRIBER_PENDING, subscribers)
+            assertNotIn(OWNER, subscribers)
+
+        d = self.node.get_subscribers()
+        d.addCallback(cb)
+        return d
+
+    def testIsSubscriber(self):
+        def cb(subscribed):
+            assertEquals(subscribed[0][1], True)
+            assertEquals(subscribed[1][1], False)
+            assertEquals(subscribed[2][1], False)
+
+        d = defer.DeferredList([self.node.is_subscribed(SUBSCRIBER),
+                                self.node.is_subscribed(SUBSCRIBER_PENDING),
+                                self.node.is_subscribed(OWNER)])
+        d.addCallback(cb)
+        return d
 
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
@@ -104,11 +206,19 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         from idavoll.memory_storage import Storage, LeafNode, Subscription, \
                                            default_config
         self.s = Storage()
-        self.s._nodes['pre-existing'] = LeafNode('pre-existing', OWNER,
-                                                 default_config)
-        self.s._nodes['to-be-deleted'] = LeafNode('to-be-deleted', OWNER, None)
-        self.s._nodes['pre-existing']._subscriptions[SUBSCRIBER.full()] = \
+        self.s._nodes['pre-existing'] = \
+                LeafNode('pre-existing', OWNER, default_config)
+        self.s._nodes['to-be-deleted'] = \
+                LeafNode('to-be-deleted', OWNER, None)
+        self.s._nodes['to-be-reconfigured'] = \
+                LeafNode('to-be-reconfigured', OWNER, default_config)
+
+        subscriptions = self.s._nodes['pre-existing']._subscriptions
+        subscriptions[SUBSCRIBER.full()] = Subscription('subscribed')
+        subscriptions[SUBSCRIBER_TO_BE_DELETED.full()] = \
                 Subscription('subscribed')
+        subscriptions[SUBSCRIBER_PENDING.full()] = \
+                Subscription('pending')
 
         return StorageTests.setUpClass(self)
 
@@ -125,12 +235,14 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         return d
 
     def tearDownClass(self):
-        return self.s._dbpool.runInteraction(self.cleandb)
+        # return self.s._dbpool.runInteraction(self.cleandb)
+        pass
 
     def init(self, cursor):
         self.cleandb(cursor)
         cursor.execute("""INSERT INTO nodes (node) VALUES ('pre-existing')""")
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-deleted')""")
+        cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-reconfigured')""")
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
                        OWNER.userhost().encode('utf-8'))
         cursor.execute("""INSERT INTO affiliations
@@ -148,12 +260,34 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                           WHERE node='pre-existing' AND jid=%s""",
                        (SUBSCRIBER.resource.encode('utf-8'),
                         SUBSCRIBER.userhost().encode('utf-8')))
+        cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
+                       SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8'))
+        cursor.execute("""INSERT INTO subscriptions
+                          (node_id, entity_id, resource, subscription)
+                          SELECT nodes.id, entities.id, %s, 'subscribed'
+                          FROM nodes, entities
+                          WHERE node='pre-existing' AND jid=%s""",
+                       (SUBSCRIBER_TO_BE_DELETED.resource.encode('utf-8'),
+                        SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8')))
+        cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
+                       SUBSCRIBER_PENDING.userhost().encode('utf-8'))
+        cursor.execute("""INSERT INTO subscriptions
+                          (node_id, entity_id, resource, subscription)
+                          SELECT nodes.id, entities.id, %s, 'pending'
+                          FROM nodes, entities
+                          WHERE node='pre-existing' AND jid=%s""",
+                       (SUBSCRIBER_PENDING.resource.encode('utf-8'),
+                        SUBSCRIBER_PENDING.userhost().encode('utf-8')))
     
     def cleandb(self, cursor):
         cursor.execute("""DELETE FROM nodes WHERE node in
                           ('non-existing', 'pre-existing', 'to-be-deleted',
-                           'new 1', 'new 2', 'new 3')""")
+                           'new 1', 'new 2', 'new 3', 'to-be-reconfigured')""")
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        OWNER.userhost().encode('utf-8'))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        SUBSCRIBER.userhost().encode('utf-8'))
+        cursor.execute("""DELETE FROM entities WHERE jid=%s""",
+                       SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8'))
+        cursor.execute("""DELETE FROM entities WHERE jid=%s""",
+                       SUBSCRIBER_PENDING.userhost().encode('utf-8'))
