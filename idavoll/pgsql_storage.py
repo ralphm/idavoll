@@ -298,7 +298,7 @@ class LeafNode(Node):
                           WHERE nodes.id = items.node_id AND
                                 nodes.node = %s and items.item=%s""",
                        (publisher.full().encode('utf8'),
-                        data.encode('utf8'),
+                        data,
                         self.id.encode('utf8'),
                         item["id"].encode('utf8')))
         if cursor.rowcount == 1:
@@ -308,7 +308,7 @@ class LeafNode(Node):
                           SELECT id, %s, %s, %s FROM nodes WHERE node=%s""",
                        (item["id"].encode('utf8'),
                         publisher.full().encode('utf8'),
-                        data.encode('utf8'),
+                        data,
                         self.id.encode('utf8')))
 
     def remove_items(self, item_ids):
@@ -326,10 +326,8 @@ class LeafNode(Node):
                            (self.id.encode('utf-8'),
                             item_id.encode('utf-8')))
 
-            if cursor.rowcount:
-                deleted.append(item_id)
-
-        return deleted
+            if not cursor.rowcount:
+                raise storage.ItemNotFound
 
     def get_items(self, max_items=None):
         return self._dbpool.runInteraction(self._get_items, max_items)
@@ -347,12 +345,12 @@ class LeafNode(Node):
             cursor.execute(query, (self.id.encode('utf8')))
 
         result = cursor.fetchall()
-        return [r[0] for r in result]
+        return [unicode(r[0], 'utf8') for r in result]
 
-    def get_items_by_ids(self, item_ids):
-        return self._dbpool.runInteraction(self._get_items_by_ids, item_ids)
+    def get_items_by_id(self, item_ids):
+        return self._dbpool.runInteraction(self._get_items_by_id, item_ids)
 
-    def _get_items_by_ids(self, cursor, item_ids):
+    def _get_items_by_id(self, cursor, item_ids):
         self._check_node_exists(cursor)
         items = []
         for item_id in item_ids:
@@ -363,13 +361,13 @@ class LeafNode(Node):
                             item_id.encode('utf8')))
             result = cursor.fetchone()
             if result:
-                items.append(result[0])
+                items.append(unicode(result[0], 'utf8'))
         return items
 
     def purge(self):
         return self._dbpool.runInteraction(self._purge)
 
-    def _purge_node(self, cursor):
+    def _purge(self, cursor):
         self._check_node_exists(cursor)
 
         cursor.execute("""DELETE FROM items WHERE
