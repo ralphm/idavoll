@@ -10,6 +10,13 @@ import xmpp_error
 import disco
 import data_form
 
+if issubclass(domish.SerializedXML, str):
+    # Work around bug # in twisted Xish
+    class SerializedXML(unicode):
+        """ Marker class for pre-serialized XML in the DOM. """
+
+    domish.SerializedXML = SerializedXML
+
 NS_COMPONENT = 'jabber:component:accept'
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 NS_PUBSUB_EVENT = NS_PUBSUB + '#event'
@@ -60,13 +67,13 @@ class NodeNotConfigurable(Error):
 error_map = {
     storage.NodeNotFound: ('item-not-found', None),
     storage.NodeExists: ('conflict', None),
-
+    storage.SubscriptionNotFound: ('not-authorized',
+                                   'not-subscribed'),
     backend.NotAuthorized: ('not-authorized', None),
     backend.NoPayloadAllowed: ('bad-request', None),
     backend.PayloadExpected: ('bad-request', None),
     backend.NoInstantNodes: ('not-acceptable', None),
     backend.NotImplemented: ('feature-not-implemented', None),
-    backend.NotSubscribed: ('not-authorized', 'requestor-not-subscribed'),
     backend.InvalidConfigurationOption: ('not-acceptable', None),
     backend.InvalidConfigurationValue: ('not-acceptable', None),
 }
@@ -114,7 +121,6 @@ class Service(component.Service):
             d = handler(iq)
         except:
             d = defer.fail()
-
 
         d.addCallback(self.success, iq)
         d.addErrback(self.error, iq)
@@ -277,7 +283,7 @@ class ComponentServiceFromSubscriptionService(Service):
         entity["node"] = result["node"]
         entity["jid"] = subscriber.full()
         entity["affiliation"] = result["affiliation"] or 'none'
-        entity["subscription"] = result["subscription"]
+        entity["subscription"] = result["state"]
         return [reply]
 
     def onUnsubscribe(self, iq):

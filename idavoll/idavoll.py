@@ -1,6 +1,5 @@
 from twisted.words.protocols.jabber import component
 from twisted.application import service
-from twisted.python import components
 from twisted.internet import defer
 import backend
 import pubsub
