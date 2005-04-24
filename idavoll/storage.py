@@ -1,5 +1,6 @@
 from zope.interface import Interface
 from twisted.words.protocols.jabber import jid
+from twisted.xish import domish
 
 class Error(Exception):
     msg = None
@@ -14,6 +15,9 @@ class SubscriptionNotFound(Error):
     pass
 
 class SubscriptionExists(Error):
+    pass
+
+class ItemNotFound(Error):
     pass
 
 class IStorage(Interface):
@@ -86,7 +90,8 @@ class IStorage(Interface):
 
 
 class INode(Interface):
-    """ """
+    """ Interface to the class of objects that represent nodes. """
+
     def get_type(self):
         """ Get node's type.
         
@@ -179,21 +184,58 @@ class INode(Interface):
         """
 
 class ILeafNode(Interface):
-    """ """
+    """ Interface to the class of objects that represent leaf nodes. """
+
     def store_items(self, items, publisher):
-        """ """
+        """ Store items in persistent storage for later retrieval.
+        
+        @param items: The list of items to be stored. Each item is the
+                      L{domish} representation of the XML fragment as defined
+                      for C{<item/>} in the
+                      C{http://jabber.org/protocol/pubsub} namespace.
+        @type items: L{list} of {domish.Element}
+        @param publisher: JID of the publishing entity.
+        @type publisher: L{jid.JID}
+        @return: deferred that fires upon success.
+        """
 
     def remove_items(self, item_ids):
-        """ """
+        """ Remove items by id
+        
+        @param item_ids: L{list} of item ids.
+        @return: deferred that fires when all given items were deleted, or
+                 a failure if one of them was not found.
+        """
 
     def get_items(self, max_items=None):
-        """ """
+        """ Get items.
+
+        If C{max_items} is not given, all items in the node are returned,
+        just like C{get_items_by_id}. Otherwise, C{max_items} limits
+        the returned items to a maximum of that number of most recently
+        published items.
+       
+        @param max_items: if given, a natural number (>0) that limits the
+                          returned number of items.
+        @return: deferred that fires with a C{list} of found items.
+        """
 
     def get_items_by_id(self, item_ids):
-        """ """
+        """ Get items by item id.
+
+        Each item in the returned list is a unicode string that
+        represent the XML of the item as it was published, including the
+        item wrapper with item id.
+        
+        @param item_ids: L{list} of item ids.
+        @return: deferred that fires with a C{list} of found items.
+        """
 
     def purge(self):
-        """ """
+        """ Purge node of all items in persistent storage.
+        
+        @return: deferred that fires when the node has been purged.
+        """
 
 
 class ISubscription(Interface):
