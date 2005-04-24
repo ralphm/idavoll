@@ -5,7 +5,7 @@ from twisted.application import service
 from twisted.xish import utility
 from twisted.internet import defer
 from zope.interface import implements
-import backend
+import backend, storage
 
 def _get_affiliation(node, entity):
     d = node.get_affiliation(entity)
@@ -103,6 +103,7 @@ class PublishService(service.Service):
             d = defer.succeed(None)
 
         d.addCallback(self._do_notify, node.id, items, deliver_payloads)
+        return d
 
     def _do_notify(self, result, node_id, items, deliver_payloads):
         if items and not deliver_payloads:
@@ -154,12 +155,12 @@ class SubscriptionService(service.Service):
 
         d = node.add_subscription(subscriber, 'subscribed')
         d.addCallback(lambda _: 'subscribed')
-        d.addErrback(self._get_subscription, node)
+        d.addErrback(self._get_subscription, node, subscriber)
         d.addCallback(self._return_subscription, affiliation, node.id)
         return d
 
-    def _get_subscription(self, failure, node):
-        failure.Trap(storage.SubscriptionExists)
+    def _get_subscription(self, failure, node, subscriber):
+        failure.trap(storage.SubscriptionExists)
         return node.get_subscription(subscriber)
 
     def _return_subscription(self, result, affiliation, node_id):
@@ -320,11 +321,11 @@ class RetractionService(service.Service):
             raise backend.NodeNotPersistent
                                                                                 
         d = node.remove_items(item_ids)
-        d.addCallback(self._do_notify_retraction, node.id)
+        d.addCallback(self._do_notify_retraction, item_ids, node.id)
         return d
                                                                                 
-    def _do_notify_retraction(self, result, node_id):
-        self.parent.dispatch({ 'item_ids': result, 'node_id': node_id },
+    def _do_notify_retraction(self, result, item_ids, node_id):
+        self.parent.dispatch({ 'item_ids': item_ids, 'node_id': node_id },
                              '//event/pubsub/retract')
                                                                                 
     def purge_node(self, node_id, requestor):
