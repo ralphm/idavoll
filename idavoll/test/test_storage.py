@@ -2,14 +2,34 @@ from twisted.trial import unittest
 from twisted.trial.assertions import *
 from twisted.words.protocols.jabber import jid
 from twisted.internet import defer
+from twisted.xish import domish
 
-from idavoll import storage
+from idavoll import storage, pubsub
 
 OWNER = jid.JID('owner@example.com')
 SUBSCRIBER = jid.JID('subscriber@example.com/Home')
 SUBSCRIBER_NEW = jid.JID('new@example.com/Home')
 SUBSCRIBER_TO_BE_DELETED = jid.JID('to_be_deleted@example.com/Home')
 SUBSCRIBER_PENDING = jid.JID('pending@example.com/Home')
+PUBLISHER = jid.JID('publisher@example.com')
+ITEM = domish.Element((pubsub.NS_PUBSUB, 'item'), pubsub.NS_PUBSUB)
+ITEM['id'] = 'current'
+ITEM.addElement(('testns', 'test'), content=u'Test \u2083 item')
+ITEM_NEW = domish.Element((pubsub.NS_PUBSUB, 'item'), pubsub.NS_PUBSUB)
+ITEM_NEW['id'] = 'new'
+ITEM_NEW.addElement(('testns', 'test'), content=u'Test \u2083 item')
+ITEM_UPDATED = domish.Element((pubsub.NS_PUBSUB, 'item'), pubsub.NS_PUBSUB)
+ITEM_UPDATED['id'] = 'current'
+ITEM_UPDATED.addElement(('testns', 'test'), content=u'Test \u2084 item')
+ITEM_TO_BE_DELETED = domish.Element((pubsub.NS_PUBSUB, 'item'),
+                                    pubsub.NS_PUBSUB)
+ITEM_TO_BE_DELETED['id'] = 'to-be-deleted'
+ITEM_TO_BE_DELETED.addElement(('testns', 'test'), content=u'Test \u2083 item')
+ITEM_TO_NOT_BE_DELETED = domish.Element((pubsub.NS_PUBSUB, 'item'),
+                                    pubsub.NS_PUBSUB)
+ITEM_TO_NOT_BE_DELETED['id'] = 'to-not-be-deleted'
+ITEM_TO_NOT_BE_DELETED.addElement(('testns', 'test'),
+                                  content=u'Test \u2083 item')
 
 class StorageTests:
 
@@ -200,6 +220,88 @@ class StorageTests:
         d.addCallback(cb)
         return d
 
+    def testStoreItems(self):
+        return self.node.store_items([ITEM_NEW], PUBLISHER)
+
+    def testStoreUpdatedItems(self):
+        def cb1(void):
+            return self.node.get_items_by_id(['current'])
+
+        def cb2(result):
+            assertEqual(result[0], unicode(ITEM_UPDATED.toXml(), 'utf-8'))
+
+        d = self.node.store_items([ITEM_UPDATED], PUBLISHER)
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        return d
+
+    def testRemoveItems(self):
+        def cb1(void):
+            return self.node.get_items_by_id(['to-be-deleted'])
+
+        def cb2(result):
+            assertEqual(len(result), 0)
+
+        d = self.node.remove_items(['to-be-deleted'])
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        return d
+
+    def testRemoveNonExistingItems(self):
+        d = self.node.remove_items(['to-not-be-deleted', 'non-existing'])
+        assertFailure(d, storage.ItemNotFound)
+        return d
+
+    def testGetItems(self):
+        def cb(result):
+            assertIn(unicode(ITEM.toXml(), 'utf-8'), result)
+
+        d = self.node.get_items()
+        d.addCallback(cb)
+        return d
+
+    def testLastItem(self):
+        def cb(result):
+            assertEqual([unicode(ITEM.toXml(), 'utf-8')], result)
+
+        d = self.node.get_items(1)
+        d.addCallback(cb)
+        return d
+
+    def testGetItemsById(self):
+        def cb(result):
+            assertEqual(len(result), 1)
+
+        d = self.node.get_items_by_id(['current'])
+        d.addCallback(cb)
+        return d
+
+    def testGetNonExistingItemsById(self):
+        def cb(result):
+            assertEqual(len(result), 0)
+
+        d = self.node.get_items_by_id(['non-existing'])
+        d.addCallback(cb)
+        return d
+
+    def testPurge(self):
+        def cb1(node):
+            d = node.purge()
+            d.addCallback(lambda _: node)
+            return d
+
+        def cb2(node):
+            return node.get_items()
+        
+        def cb3(result):
+            assertEqual([], result)
+
+        d = self.s.get_node('to-be-purged')
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        d.addCallback(cb3)
+        return d
+
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUpClass(self):
@@ -212,6 +314,8 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
                 LeafNode('to-be-deleted', OWNER, None)
         self.s._nodes['to-be-reconfigured'] = \
                 LeafNode('to-be-reconfigured', OWNER, default_config)
+        self.s._nodes['to-be-purged'] = \
+                LeafNode('to-be-purged', OWNER, None)
 
         subscriptions = self.s._nodes['pre-existing']._subscriptions
         subscriptions[SUBSCRIBER.full()] = Subscription('subscribed')
@@ -219,6 +323,17 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
                 Subscription('subscribed')
         subscriptions[SUBSCRIBER_PENDING.full()] = \
                 Subscription('pending')
+
+        item = (ITEM_TO_BE_DELETED.toXml(), PUBLISHER)
+        self.s._nodes['pre-existing']._items['to-be-deleted'] = item
+        self.s._nodes['pre-existing']._itemlist.append(item)
+        self.s._nodes['pre-existing']._items['to-not-be-deleted'] = item
+        self.s._nodes['pre-existing']._itemlist.append(item)
+        self.s._nodes['to-be-purged']._items['to-be-deleted'] = item
+        self.s._nodes['to-be-purged']._itemlist.append(item)
+        item = (ITEM.toXml(), PUBLISHER)
+        self.s._nodes['pre-existing']._items['current'] = item
+        self.s._nodes['pre-existing']._itemlist.append(item)
 
         return StorageTests.setUpClass(self)
 
@@ -235,7 +350,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         return d
 
     def tearDownClass(self):
-        # return self.s._dbpool.runInteraction(self.cleandb)
+        #return self.s._dbpool.runInteraction(self.cleandb)
         pass
 
     def init(self, cursor):
@@ -243,6 +358,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         cursor.execute("""INSERT INTO nodes (node) VALUES ('pre-existing')""")
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-deleted')""")
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-reconfigured')""")
+        cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-purged')""")
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
                        OWNER.userhost().encode('utf-8'))
         cursor.execute("""INSERT INTO affiliations
@@ -278,11 +394,42 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                           WHERE node='pre-existing' AND jid=%s""",
                        (SUBSCRIBER_PENDING.resource.encode('utf-8'),
                         SUBSCRIBER_PENDING.userhost().encode('utf-8')))
+        cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
+                       PUBLISHER.userhost().encode('utf-8'))
+        cursor.execute("""INSERT INTO items
+                          (node_id, publisher, item, data, date)
+                          SELECT nodes.id, %s, 'to-be-deleted', %s,
+                                 now() - interval '1 day'
+                          FROM nodes
+                          WHERE node='pre-existing'""",
+                       (PUBLISHER.userhost().encode('utf-8'),
+                        ITEM_TO_BE_DELETED.toXml()))
+        cursor.execute("""INSERT INTO items
+                          (node_id, publisher, item, data, date)
+                          SELECT nodes.id, %s, 'to-not-be-deleted', %s,
+                                 now() - interval '1 day'
+                          FROM nodes
+                          WHERE node='pre-existing'""",
+                       (PUBLISHER.userhost().encode('utf-8'),
+                        ITEM_TO_NOT_BE_DELETED.toXml()))
+        cursor.execute("""INSERT INTO items (node_id, publisher, item, data)
+                          SELECT nodes.id, %s, 'to-be-deleted', %s
+                          FROM nodes
+                          WHERE node='to-be-purged'""",
+                       (PUBLISHER.userhost().encode('utf-8'),
+                        ITEM_TO_BE_DELETED.toXml()))
+        cursor.execute("""INSERT INTO items (node_id, publisher, item, data)
+                          SELECT nodes.id, %s, 'current', %s
+                          FROM nodes
+                          WHERE node='pre-existing'""",
+                       (PUBLISHER.userhost().encode('utf-8'),
+                        ITEM.toXml()))
     
     def cleandb(self, cursor):
         cursor.execute("""DELETE FROM nodes WHERE node in
                           ('non-existing', 'pre-existing', 'to-be-deleted',
-                           'new 1', 'new 2', 'new 3', 'to-be-reconfigured')""")
+                           'new 1', 'new 2', 'new 3', 'to-be-reconfigured',
+                           'to-be-purged')""")
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        OWNER.userhost().encode('utf-8'))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
@@ -291,3 +438,5 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                        SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8'))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        SUBSCRIBER_PENDING.userhost().encode('utf-8'))
+        cursor.execute("""DELETE FROM entities WHERE jid=%s""",
+                       PUBLISHER.userhost().encode('utf-8'))
