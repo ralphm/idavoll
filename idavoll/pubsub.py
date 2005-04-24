@@ -140,14 +140,16 @@ class ComponentServiceFromService(Service):
             info.append(disco.Identity('pubsub', 'generic',
                                        'Generic Pubsub Service'))
 
-            if self.backend.supports_publisher_affiliation():
-                info.append(disco.Feature(NS_PUBSUB + "#publisher-affiliation"))
+            info.append(disco.Feature(NS_PUBSUB + "#meta-data"))
 
             if self.backend.supports_outcast_affiliation():
                 info.append(disco.Feature(NS_PUBSUB + "#outcast-affiliation"))
 
             if self.backend.supports_persistent_items():
                 info.append(disco.Feature(NS_PUBSUB + "#persistent-items"))
+
+            if self.backend.supports_publisher_affiliation():
+                info.append(disco.Feature(NS_PUBSUB + "#publisher-affiliation"))
 
             return defer.succeed(info)
         else:
@@ -431,6 +433,14 @@ class ComponentServiceFromAffiliationsService(Service):
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_AFFILIATIONS, self.onAffiliations)
 
+    def get_disco_info(self, node):
+        info = []
+
+        if not node:
+            info.append(disco.Feature(NS_PUBSUB + "#retrieve-affiliations"))
+
+        return defer.succeed(info)
+
     def onAffiliations(self, iq):
         self.handler_wrapper(self._onAffiliations, iq)
 
@@ -517,6 +527,8 @@ class ComponentServiceFromRetractionService(Service):
 
         if not node:
             info.append(disco.Feature(NS_PUBSUB + "#delete-any"))
+            info.append(disco.Feature(NS_PUBSUB + "#retract-items"))
+            info.append(disco.Feature(NS_PUBSUB + "#purge-nodes"))
 
         return defer.succeed(info)
 
@@ -562,6 +574,14 @@ class ComponentServiceFromNodeDeletionService(Service):
     def componentConnected(self, xmlstream):
         self.backend.register_pre_delete(self._pre_delete)
         xmlstream.addObserver(PUBSUB_DELETE, self.onDelete)
+
+    def get_disco_info(self, node):
+        info = []
+
+        if not node:
+            info.append(disco.Feature(NS_PUBSUB + "#delete-nodes"))
+
+        return defer.succeed(info)
 
     def _pre_delete(self, node_id):
         d = self.backend.get_subscribers(node_id)
