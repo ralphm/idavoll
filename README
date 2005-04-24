@@ -15,19 +15,8 @@ Current Status
 There are two different backends: one using PostgreSQL for storage, and one
 just keeping everything in memory.
 
-In Idavoll the mimimal requirements of JEP-0060 version 1.6 are implemented.
-It also returns the following features:
-
-    http://jabber.org/protocol/pubsub#outcast-affiliation
-    http://jabber.org/protocol/pubsub#publisher-affiliation
-    http://jabber.org/protocol/pubsub#persistent-items
-    http://jabber.org/protocol/pubsub#subscribe
-    http://jabber.org/protocol/pubsub#create-nodes
-    http://jabber.org/protocol/pubsub#instant-nodes
-
-When using the PostgreSQL backend the following features are also supported:
-
-    http://jabber.org/protocol/pubsub#retrieve-items
+In Idavoll the mimimal requirements of JEP-0060 version 1.7 are implemented
+plus most optional features, as returned by Service Discovery.
 
 Requirements
 ============
