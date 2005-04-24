@@ -161,22 +161,22 @@ class LeafNode(Node):
         deleted = []
 
         for item_id in item_ids:
-            try:
-                item = self._items[item_id]
-                self._itemlist.remove(item)
-                del self._items[item_id]
-                deleted.append(item_id)
-            except KeyError:
-                pass
+            if not self._items.has_key(item_id):
+                return defer.fail(storage.ItemNotFound())
+
+        for item_id in item_ids:
+            item = self._items[item_id]
+            self._itemlist.remove(item)
+            del self._items[item_id]
         
-        return defer.succeed(deleted)
+        return defer.succeed(None)
 
     def get_items(self, max_items=None):
         if max_items:
             list = self._itemlist[-max_items:]
         else:
             list = self._itemlist
-        return defer.succeed([item[0] for item in list])
+        return defer.succeed([unicode(item[0], 'utf-8') for item in list])
     
     def get_items_by_id(self, item_ids):
         items = []
@@ -186,7 +186,7 @@ class LeafNode(Node):
             except KeyError:
                 pass
             else:
-                items.append(item[0])
+                items.append(unicode(item[0], 'utf-8'))
         return defer.succeed(items)
 
     def purge(self):
