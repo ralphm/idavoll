@@ -32,21 +32,7 @@ When using the PostgreSQL backend the following features are also supported:
 Requirements
 ============
 
-- Twisted >= 1.2.0
-- The following patches to the twisted/xish directory:
-
-    http://mag.ik.nu/~ralphm/tmp/domish.py.patch
-    http://mag.ik.nu/~ralphm/tmp/utility.py.patch
-    http://mag.ik.nu/~ralphm/tmp/xpath.py.patch
-
-- The following patches to the twisted/protocols/jabber directory:
-
-    http://mag.ik.nu/~ralphm/tmp/jid.py.patch
-
-- Add the following file in the twisted/protocols/jabber directory:
-
-    http://mag.ik.nu/~ralphm/tmp/xmpp_stringprep.py
-
+- Twisted >= 2.0.0
 - A jabber server like jabberd 1.4.x
 
 For the PostgreSQL backend, the following is also required:
@@ -74,7 +60,8 @@ Then, in the same directory as this file run:
   mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238
   twistd -rf idavoll.tap
 
-This uses the (default) memory based backend.
+This uses the (default) memory based backend. You can ignore the deprecation
+warnings.
 
 For using the PostgreSQL backend, create a database (for example named pubsub)
 like so:
