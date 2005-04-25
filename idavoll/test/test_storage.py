@@ -360,49 +360,49 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-reconfigured')""")
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-purged')""")
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       OWNER.userhost().encode('utf-8'))
+                       OWNER.userhost())
         cursor.execute("""INSERT INTO affiliations
                           (node_id, entity_id, affiliation)
                           SELECT nodes.id, entities.id, 'owner'
                           FROM nodes, entities
                           WHERE node='pre-existing' AND jid=%s""",
-                       OWNER.userhost().encode('utf-8'))
+                       OWNER.userhost())
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER.userhost().encode('utf-8'))
+                       SUBSCRIBER.userhost())
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, subscription)
                           SELECT nodes.id, entities.id, %s, 'subscribed'
                           FROM nodes, entities
                           WHERE node='pre-existing' AND jid=%s""",
-                       (SUBSCRIBER.resource.encode('utf-8'),
-                        SUBSCRIBER.userhost().encode('utf-8')))
+                       (SUBSCRIBER.resource,
+                        SUBSCRIBER.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8'))
+                       SUBSCRIBER_TO_BE_DELETED.userhost())
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, subscription)
                           SELECT nodes.id, entities.id, %s, 'subscribed'
                           FROM nodes, entities
                           WHERE node='pre-existing' AND jid=%s""",
-                       (SUBSCRIBER_TO_BE_DELETED.resource.encode('utf-8'),
-                        SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8')))
+                       (SUBSCRIBER_TO_BE_DELETED.resource,
+                        SUBSCRIBER_TO_BE_DELETED.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER_PENDING.userhost().encode('utf-8'))
+                       SUBSCRIBER_PENDING.userhost())
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, subscription)
                           SELECT nodes.id, entities.id, %s, 'pending'
                           FROM nodes, entities
                           WHERE node='pre-existing' AND jid=%s""",
-                       (SUBSCRIBER_PENDING.resource.encode('utf-8'),
-                        SUBSCRIBER_PENDING.userhost().encode('utf-8')))
+                       (SUBSCRIBER_PENDING.resource,
+                        SUBSCRIBER_PENDING.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       PUBLISHER.userhost().encode('utf-8'))
+                       PUBLISHER.userhost())
         cursor.execute("""INSERT INTO items
                           (node_id, publisher, item, data, date)
                           SELECT nodes.id, %s, 'to-be-deleted', %s,
                                  now() - interval '1 day'
                           FROM nodes
                           WHERE node='pre-existing'""",
-                       (PUBLISHER.userhost().encode('utf-8'),
+                       (PUBLISHER.userhost(),
                         ITEM_TO_BE_DELETED.toXml()))
         cursor.execute("""INSERT INTO items
                           (node_id, publisher, item, data, date)
@@ -410,19 +410,19 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                                  now() - interval '1 day'
                           FROM nodes
                           WHERE node='pre-existing'""",
-                       (PUBLISHER.userhost().encode('utf-8'),
+                       (PUBLISHER.userhost(),
                         ITEM_TO_NOT_BE_DELETED.toXml()))
         cursor.execute("""INSERT INTO items (node_id, publisher, item, data)
                           SELECT nodes.id, %s, 'to-be-deleted', %s
                           FROM nodes
                           WHERE node='to-be-purged'""",
-                       (PUBLISHER.userhost().encode('utf-8'),
+                       (PUBLISHER.userhost(),
                         ITEM_TO_BE_DELETED.toXml()))
         cursor.execute("""INSERT INTO items (node_id, publisher, item, data)
                           SELECT nodes.id, %s, 'current', %s
                           FROM nodes
                           WHERE node='pre-existing'""",
-                       (PUBLISHER.userhost().encode('utf-8'),
+                       (PUBLISHER.userhost(),
                         ITEM.toXml()))
     
     def cleandb(self, cursor):
@@ -431,12 +431,12 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                            'new 1', 'new 2', 'new 3', 'to-be-reconfigured',
                            'to-be-purged')""")
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       OWNER.userhost().encode('utf-8'))
+                       OWNER.userhost())
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER.userhost().encode('utf-8'))
+                       SUBSCRIBER.userhost())
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER_TO_BE_DELETED.userhost().encode('utf-8'))
+                       SUBSCRIBER_TO_BE_DELETED.userhost())
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER_PENDING.userhost().encode('utf-8'))
+                       SUBSCRIBER_PENDING.userhost())
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       PUBLISHER.userhost().encode('utf-8'))
+                       PUBLISHER.userhost())
