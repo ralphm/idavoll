@@ -10,8 +10,11 @@ class Storage:
     implements(storage.IStorage)
 
     def __init__(self, user, database):
-        self._dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL', user=user,
-                database=database)
+        self._dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+                                             user=user,
+                                             database=database,
+                                             client_encoding='utf-8'
+                                             )
 
     def get_node(self, node_id):
         return self._dbpool.runInteraction(self._get_node, node_id)
@@ -40,8 +43,8 @@ class Storage:
         return self._dbpool.runInteraction(self._create_node, node_id, owner)
 
     def _create_node(self, cursor, node_id, owner):
-        node_id = node_id.encode('utf-8')
-        owner = owner.userhost().encode('utf-8')
+        node_id = node_id
+        owner = owner.userhost()
         try:
             cursor.execute("""INSERT INTO nodes (node) VALUES (%s)""",
                            (node_id))
@@ -68,7 +71,7 @@ class Storage:
 
     def _delete_node(self, cursor, node_id):
         cursor.execute("""DELETE FROM nodes WHERE node=%s""",
-                       (node_id.encode('utf-8'),))
+                       (node_id,))
 
         if cursor.rowcount != 1:
             raise storage.NodeNotFound
@@ -80,7 +83,7 @@ class Storage:
                                         JOIN nodes ON
                                         (nodes.id=affiliations.node_id)
                                         WHERE jid=%s""",
-                                     (entity.userhost().encode('utf8'),))
+                                     (entity.userhost(),))
         d.addCallback(lambda results: [tuple(r) for r in results])
         return d
 
@@ -91,7 +94,7 @@ class Storage:
                                      JOIN nodes ON
                                      (nodes.id=subscriptions.node_id)
                                      WHERE jid=%s""",
-                                  (entity.userhost().encode('utf8'),))
+                                  (entity.userhost(),))
         d.addCallback(self._convert_subscription_jids)
         return d
 
@@ -109,7 +112,7 @@ class Node:
 
     def _check_node_exists(self, cursor):
         cursor.execute("""SELECT id FROM nodes WHERE node=%s""",
-                       (self.id.encode('utf8')))
+                       (self.id))
         if not cursor.fetchone():
             raise backend.NodeNotFound
 
@@ -136,7 +139,7 @@ class Node:
                           WHERE node=%s""",
                        (config["pubsub#persist_items"],
                         config["pubsub#deliver_payloads"],
-                        self.id.encode('utf-8')))
+                        self.id))
 
     def _set_cached_configuration(self, void, config):
         self._config = config
@@ -155,8 +158,8 @@ class Node:
                           JOIN nodes ON (node_id=nodes.id)
                           JOIN entities ON (entity_id=entities.id)
                           WHERE node=%s AND jid=%s""",
-                       (self.id.encode('utf8'),
-                        entity.userhost().encode('utf8')))
+                       (self.id,
+                        entity.userhost()))
 
         try:
             return cursor.fetchone()[0]
@@ -177,9 +180,9 @@ class Node:
                           JOIN entities ON
                                (entities.id=subscriptions.entity_id)
                           WHERE node=%s AND jid=%s AND resource=%s""",
-                       (self.id.encode('utf8'),
-                        userhost.encode('utf8'),
-                        resource.encode('utf8')))
+                       (self.id,
+                        userhost,
+                        resource))
         try:
             return cursor.fetchone()[0]
         except TypeError:
@@ -197,7 +200,7 @@ class Node:
 
         try:
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                           (userhost.encode('utf8')))
+                           (userhost))
         except cursor._pool.dbapi.OperationalError:
             pass
 
@@ -208,10 +211,10 @@ class Node:
                               (SELECT id FROM nodes WHERE node=%s) AS n
                               CROSS JOIN
                               (SELECT id FROM entities WHERE jid=%s) AS e""",
-                           (resource.encode('utf8'),
-                            state.encode('utf8'),
-                            self.id.encode('utf8'),
-                            userhost.encode('utf8')))
+                           (resource,
+                            state,
+                            self.id,
+                            userhost))
         except cursor._pool.dbapi.OperationalError:
             raise storage.SubscriptionExists
 
@@ -229,9 +232,9 @@ class Node:
                           node_id=(SELECT id FROM nodes WHERE node=%s) AND
                           entity_id=(SELECT id FROM entities WHERE jid=%s)
                           AND resource=%s""",
-                       (self.id.encode('utf8'),
-                        userhost.encode('utf8'),
-                        resource.encode('utf8')))
+                       (self.id,
+                        userhost,
+                        resource))
         if cursor.rowcount != 1:
             raise storage.SubscriptionNotFound
 
@@ -249,7 +252,7 @@ class Node:
                           JOIN entities ON (entity_id=entities.id)
                           WHERE node=%s AND
                           subscription='subscribed'""",
-                       (self.id.encode('utf8'),))
+                       (self.id,))
         return cursor.fetchall()
 
     def _convert_to_jids(self, list):
@@ -271,9 +274,9 @@ class Node:
                           (nodes.id=subscriptions.node_id)
                           WHERE entities.jid=%s AND resource=%s
                           AND node=%s AND subscription='subscribed'""",
-                       (userhost.encode('utf8'),
-                       resource.encode('utf8'),
-                       self.id.encode('utf8')))
+                       (userhost,
+                       resource,
+                       self.id))
 
         return cursor.fetchone() is not None
 
@@ -297,19 +300,19 @@ class LeafNode(Node):
                           FROM nodes
                           WHERE nodes.id = items.node_id AND
                                 nodes.node = %s and items.item=%s""",
-                       (publisher.full().encode('utf8'),
+                       (publisher.full(),
                         data,
-                        self.id.encode('utf8'),
-                        item["id"].encode('utf8')))
+                        self.id,
+                        item["id"]))
         if cursor.rowcount == 1:
             return
 
         cursor.execute("""INSERT INTO items (node_id, item, publisher, data)
                           SELECT id, %s, %s, %s FROM nodes WHERE node=%s""",
-                       (item["id"].encode('utf8'),
-                        publisher.full().encode('utf8'),
+                       (item["id"],
+                        publisher.full(),
                         data,
-                        self.id.encode('utf8')))
+                        self.id))
 
     def remove_items(self, item_ids):
         return self._dbpool.runInteraction(self._remove_items, item_ids)
@@ -323,8 +326,8 @@ class LeafNode(Node):
             cursor.execute("""DELETE FROM items WHERE
                               node_id=(SELECT id FROM nodes WHERE node=%s) AND
                               item=%s""",
-                           (self.id.encode('utf-8'),
-                            item_id.encode('utf-8')))
+                           (self.id,
+                            item_id))
 
             if not cursor.rowcount:
                 raise storage.ItemNotFound
@@ -339,13 +342,13 @@ class LeafNode(Node):
                    WHERE node=%s ORDER BY date DESC"""
         if max_items:
             cursor.execute(query + " LIMIT %s",
-                           (self.id.encode('utf8'),
+                           (self.id,
                             max_items))
         else:
-            cursor.execute(query, (self.id.encode('utf8')))
+            cursor.execute(query, (self.id))
 
         result = cursor.fetchall()
-        return [unicode(r[0], 'utf8') for r in result]
+        return [unicode(r[0], 'utf-8') for r in result]
 
     def get_items_by_id(self, item_ids):
         return self._dbpool.runInteraction(self._get_items_by_id, item_ids)
@@ -357,11 +360,11 @@ class LeafNode(Node):
             cursor.execute("""SELECT data FROM nodes JOIN items ON
                               (nodes.id=items.node_id)
                               WHERE node=%s AND item=%s""",
-                           (self.id.encode('utf8'),
-                            item_id.encode('utf8')))
+                           (self.id,
+                            item_id))
             result = cursor.fetchone()
             if result:
-                items.append(unicode(result[0], 'utf8'))
+                items.append(unicode(result[0], 'utf-8'))
         return items
 
     def purge(self):
@@ -372,5 +375,5 @@ class LeafNode(Node):
 
         cursor.execute("""DELETE FROM items WHERE
                           node_id=(SELECT id FROM nodes WHERE node=%s)""",
-                       (self.id.encode('utf-8'),))
+                       (self.id,))
 
