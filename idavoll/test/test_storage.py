@@ -221,7 +221,16 @@ class StorageTests:
         return d
 
     def testStoreItems(self):
-        return self.node.store_items([ITEM_NEW], PUBLISHER)
+        def cb1(void):
+            return self.node.get_items_by_id(['new'])
+
+        def cb2(result):
+            assertEqual(result[0], unicode(ITEM_NEW.toXml(), 'utf-8'))
+
+        d = self.node.store_items([ITEM_NEW], PUBLISHER)
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        return d
 
     def testStoreUpdatedItems(self):
         def cb1(void):
