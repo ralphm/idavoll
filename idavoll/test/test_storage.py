@@ -31,6 +31,11 @@ ITEM_TO_NOT_BE_DELETED['id'] = 'to-not-be-deleted'
 ITEM_TO_NOT_BE_DELETED.addElement(('testns', 'test'),
                                   content=u'Test \u2083 item')
 
+def decode(object):
+    if isinstance(object, str):
+        object = object.decode('utf-8')
+    return object
+
 class StorageTests:
 
     def _assignTestNode(self, node):
@@ -225,7 +230,7 @@ class StorageTests:
             return self.node.get_items_by_id(['new'])
 
         def cb2(result):
-            assertEqual(result[0], unicode(ITEM_NEW.toXml(), 'utf-8'))
+            assertEqual(result[0], decode(ITEM_NEW.toXml()))
 
         d = self.node.store_items([ITEM_NEW], PUBLISHER)
         d.addCallback(cb1)
@@ -237,7 +242,7 @@ class StorageTests:
             return self.node.get_items_by_id(['current'])
 
         def cb2(result):
-            assertEqual(result[0], unicode(ITEM_UPDATED.toXml(), 'utf-8'))
+            assertEqual(result[0], decode(ITEM_UPDATED.toXml()))
 
         d = self.node.store_items([ITEM_UPDATED], PUBLISHER)
         d.addCallback(cb1)
@@ -263,7 +268,7 @@ class StorageTests:
 
     def testGetItems(self):
         def cb(result):
-            assertIn(unicode(ITEM.toXml(), 'utf-8'), result)
+            assertIn(decode(ITEM.toXml()), result)
 
         d = self.node.get_items()
         d.addCallback(cb)
@@ -271,7 +276,7 @@ class StorageTests:
 
     def testLastItem(self):
         def cb(result):
-            assertEqual([unicode(ITEM.toXml(), 'utf-8')], result)
+            assertEqual([decode(ITEM.toXml())], result)
 
         d = self.node.get_items(1)
         d.addCallback(cb)
@@ -333,14 +338,14 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         subscriptions[SUBSCRIBER_PENDING.full()] = \
                 Subscription('pending')
 
-        item = (ITEM_TO_BE_DELETED.toXml(), PUBLISHER)
+        item = (decode(ITEM_TO_BE_DELETED.toXml()), PUBLISHER)
         self.s._nodes['pre-existing']._items['to-be-deleted'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
         self.s._nodes['pre-existing']._items['to-not-be-deleted'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
         self.s._nodes['to-be-purged']._items['to-be-deleted'] = item
         self.s._nodes['to-be-purged']._itemlist.append(item)
-        item = (ITEM.toXml(), PUBLISHER)
+        item = (decode(ITEM.toXml()), PUBLISHER)
         self.s._nodes['pre-existing']._items['current'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
 

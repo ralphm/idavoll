@@ -149,7 +149,10 @@ class LeafNode(Node):
     def store_items(self, items, publisher):
         for data in items:
             id = data["id"]
-            item = (data.toXml(), publisher)
+            data = data.toXml()
+            if isinstance(data, str):
+                data = data.decode('utf-8')
+            item = (data, publisher)
             if id in self._items:
                 self._itemlist.remove(self._items[id])
             self._items[id] = item
@@ -176,7 +179,7 @@ class LeafNode(Node):
             list = self._itemlist[-max_items:]
         else:
             list = self._itemlist
-        return defer.succeed([unicode(item[0], 'utf-8') for item in list])
+        return defer.succeed([item[0] for item in list])
     
     def get_items_by_id(self, item_ids):
         items = []
@@ -186,7 +189,7 @@ class LeafNode(Node):
             except KeyError:
                 pass
             else:
-                items.append(unicode(item[0], 'utf-8'))
+                items.append(item[0])
         return defer.succeed(items)
 
     def purge(self):
