@@ -493,7 +493,7 @@ class ComponentServiceFromItemRetrievalService(Service):
                 raise BadRequest
 
         item_ids = []
-        for child in iq.pubsub.items.children:
+        for child in iq.pubsub.items.elements():
             if child.name == 'item' and child.uri == NS_PUBSUB:
                 try:
                     item_ids.append(child["id"])
