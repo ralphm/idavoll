@@ -321,10 +321,10 @@ class RetractionService(service.Service):
             raise backend.NodeNotPersistent
                                                                                 
         d = node.remove_items(item_ids)
-        d.addCallback(self._do_notify_retraction, item_ids, node.id)
+        d.addCallback(self._do_notify_retraction, node.id)
         return d
                                                                                 
-    def _do_notify_retraction(self, result, item_ids, node_id):
+    def _do_notify_retraction(self, item_ids, node_id):
         self.parent.dispatch({ 'item_ids': item_ids, 'node_id': node_id },
                              '//event/pubsub/retract')
                                                                                 

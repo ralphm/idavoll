@@ -17,9 +17,6 @@ class SubscriptionNotFound(Error):
 class SubscriptionExists(Error):
     pass
 
-class ItemNotFound(Error):
-    pass
-
 class IStorage(Interface):
     """ Storage interface """
 
@@ -203,8 +200,8 @@ class ILeafNode(Interface):
         """ Remove items by id
         
         @param item_ids: L{list} of item ids.
-        @return: deferred that fires when all given items were deleted, or
-                 a failure if one of them was not found.
+        @return: deferred that fires with a L{list} of ids of the items that
+                 were deleted
         """
 
     def get_items(self, max_items=None):
@@ -217,7 +214,7 @@ class ILeafNode(Interface):
        
         @param max_items: if given, a natural number (>0) that limits the
                           returned number of items.
-        @return: deferred that fires with a C{list} of found items.
+        @return: deferred that fires with a L{list} of found items.
         """
 
     def get_items_by_id(self, item_ids):
@@ -228,7 +225,7 @@ class ILeafNode(Interface):
         item wrapper with item id.
         
         @param item_ids: L{list} of item ids.
-        @return: deferred that fires with a C{list} of found items.
+        @return: deferred that fires with a L{list} of found items.
         """
 
     def purge(self):

@@ -25,11 +25,6 @@ ITEM_TO_BE_DELETED = domish.Element((pubsub.NS_PUBSUB, 'item'),
                                     pubsub.NS_PUBSUB)
 ITEM_TO_BE_DELETED['id'] = 'to-be-deleted'
 ITEM_TO_BE_DELETED.addElement(('testns', 'test'), content=u'Test \u2083 item')
-ITEM_TO_NOT_BE_DELETED = domish.Element((pubsub.NS_PUBSUB, 'item'),
-                                    pubsub.NS_PUBSUB)
-ITEM_TO_NOT_BE_DELETED['id'] = 'to-not-be-deleted'
-ITEM_TO_NOT_BE_DELETED.addElement(('testns', 'test'),
-                                  content=u'Test \u2083 item')
 
 def decode(object):
     if isinstance(object, str):
@@ -250,7 +245,8 @@ class StorageTests:
         return d
 
     def testRemoveItems(self):
-        def cb1(void):
+        def cb1(result):
+            assertEqual(result, ['to-be-deleted'])
             return self.node.get_items_by_id(['to-be-deleted'])
 
         def cb2(result):
@@ -262,8 +258,11 @@ class StorageTests:
         return d
 
     def testRemoveNonExistingItems(self):
-        d = self.node.remove_items(['to-not-be-deleted', 'non-existing'])
-        assertFailure(d, storage.ItemNotFound)
+        def cb(result):
+            assertEqual(result, [])
+
+        d = self.node.remove_items(['non-existing'])
+        d.addCallback(cb)
         return d
 
     def testGetItems(self):
@@ -341,8 +340,6 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         item = (decode(ITEM_TO_BE_DELETED.toXml()), PUBLISHER)
         self.s._nodes['pre-existing']._items['to-be-deleted'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
-        self.s._nodes['pre-existing']._items['to-not-be-deleted'] = item
-        self.s._nodes['pre-existing']._itemlist.append(item)
         self.s._nodes['to-be-purged']._items['to-be-deleted'] = item
         self.s._nodes['to-be-purged']._itemlist.append(item)
         item = (decode(ITEM.toXml()), PUBLISHER)
@@ -418,14 +415,6 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                           WHERE node='pre-existing'""",
                        (PUBLISHER.userhost(),
                         ITEM_TO_BE_DELETED.toXml()))
-        cursor.execute("""INSERT INTO items
-                          (node_id, publisher, item, data, date)
-                          SELECT nodes.id, %s, 'to-not-be-deleted', %s,
-                                 now() - interval '1 day'
-                          FROM nodes
-                          WHERE node='pre-existing'""",
-                       (PUBLISHER.userhost(),
-                        ITEM_TO_NOT_BE_DELETED.toXml()))
         cursor.execute("""INSERT INTO items (node_id, publisher, item, data)
                           SELECT nodes.id, %s, 'to-be-deleted', %s
                           FROM nodes

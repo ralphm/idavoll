@@ -329,8 +329,10 @@ class LeafNode(Node):
                            (self.id,
                             item_id))
 
-            if not cursor.rowcount:
-                raise storage.ItemNotFound
+            if cursor.rowcount:
+                deleted.append(item_id)
+
+        return deleted
 
     def get_items(self, max_items=None):
         return self._dbpool.runInteraction(self._get_items, max_items)
