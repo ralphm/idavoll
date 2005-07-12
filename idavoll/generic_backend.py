@@ -378,7 +378,7 @@ class NodeDeletionService(service.Service):
         if affiliation != 'owner':
             raise backend.NotAuthorized
 
-        d = defer.DeferredList([cb(node_id) for cb in self._callback_list],
+        d = defer.DeferredList([cb(node.id) for cb in self._callback_list],
                                consumeErrors=1)
         d.addCallback(self._do_delete, node.id)
 
