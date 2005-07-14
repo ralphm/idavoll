@@ -136,6 +136,12 @@ class Node:
 
         return defer.succeed(subscription.state == 'subscribed')
 
+    def get_affiliations(self):
+        affiliations = [(jid.JID(entity), affiliation) for entity, affiliation
+                       in self._affiliations.iteritems()]
+
+        return defer.succeed(affiliations)
+
 class LeafNode(Node):
 
     implements(storage.ILeafNode)

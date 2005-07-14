@@ -280,6 +280,23 @@ class Node:
 
         return cursor.fetchone() is not None
 
+    def get_affiliations(self):
+        return self._dbpool.runInteraction(self._get_affiliations)
+
+    def _get_affiliations(self, cursor):
+        self._check_node_exists(cursor)
+
+        cursor.execute("""SELECT jid, affiliation FROM nodes
+                          JOIN affiliations ON
+                            (nodes.id = affiliations.node_id)
+                          JOIN entities ON
+                            (affiliations.entity_id = entities.id)
+                          WHERE node=%s""",
+                       self.id)
+        result = cursor.fetchall()
+        
+        return [(jid.JID(r[0]), r[1]) for r in result]
+
 class LeafNode(Node):
 
     implements(storage.ILeafNode)
@@ -378,4 +395,3 @@ class LeafNode(Node):
         cursor.execute("""DELETE FROM items WHERE
                           node_id=(SELECT id FROM nodes WHERE node=%s)""",
                        (self.id,))
-

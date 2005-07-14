@@ -180,6 +180,14 @@ class INode(Interface):
         @return: deferred that returns a L{bool}.
         """
 
+    def get_affiliations(self):
+        """ Get affiliations of entities with this node.
+
+        @return: deferred that returns a L{list} of tuples (jid, affiliation),
+        where jid is a L(jid.JID) and affiliation is one of C{'owner'},
+        C{'publisher'}, C{'outcast'}.
+        """
+
 class ILeafNode(Interface):
     """ Interface to the class of objects that represent leaf nodes. """
 

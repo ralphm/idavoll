@@ -315,6 +315,19 @@ class StorageTests:
         d.addCallback(cb3)
         return d
 
+    def testGetNodeAffilatiations(self):
+        def cb1(node):
+            return node.get_affiliations()
+
+        def cb2(affiliations):
+            affiliations = dict(((a[0].full(), a[1]) for a in affiliations))
+            assertEquals(affiliations[OWNER.full()], 'owner')
+        
+        d = self.s.get_node('pre-existing')
+        d.addCallback(cb1)
+        d.addCallback(cb2)
+        return d
+
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUpClass(self):
