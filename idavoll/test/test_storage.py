@@ -211,10 +211,12 @@ class StorageTests:
     def testIsSubscriber(self):
         def cb(subscribed):
             assertEquals(subscribed[0][1], True)
-            assertEquals(subscribed[1][1], False)
+            assertEquals(subscribed[1][1], True)
             assertEquals(subscribed[2][1], False)
+            assertEquals(subscribed[3][1], False)
 
         d = defer.DeferredList([self.node.is_subscribed(SUBSCRIBER),
+                                self.node.is_subscribed(SUBSCRIBER.userhostJID()),
                                 self.node.is_subscribed(SUBSCRIBER_PENDING),
                                 self.node.is_subscribed(OWNER)])
         d.addCallback(cb)

@@ -258,24 +258,20 @@ class Node:
     def _convert_to_jids(self, list):
         return [jid.JID("%s/%s" % (l[0], l[1])) for l in list]
 
-    def is_subscribed(self, subscriber):
-        return self._dbpool.runInteraction(self._is_subscribed, subscriber)
+    def is_subscribed(self, entity):
+        return self._dbpool.runInteraction(self._is_subscribed, entity)
 
-    def _is_subscribed(self, cursor, subscriber):
+    def _is_subscribed(self, cursor, entity):
         self._check_node_exists(cursor)
-
-        userhost = subscriber.userhost()
-        resource = subscriber.resource or ''
 
         cursor.execute("""SELECT 1 FROM entities
                           JOIN subscriptions ON
                           (entities.id=subscriptions.entity_id)
                           JOIN nodes ON
                           (nodes.id=subscriptions.node_id)
-                          WHERE entities.jid=%s AND resource=%s
+                          WHERE entities.jid=%s
                           AND node=%s AND subscription='subscribed'""",
-                       (userhost,
-                       resource,
+                       (entity.userhost(),
                        self.id))
 
         return cursor.fetchone() is not None
@@ -297,9 +293,7 @@ class Node:
         
         return [(jid.JID(r[0]), r[1]) for r in result]
 
-class LeafNode(Node):
-
-    implements(storage.ILeafNode)
+class LeafNodeMixin:
 
     type = 'leaf'
 
@@ -395,3 +389,7 @@ class LeafNode(Node):
         cursor.execute("""DELETE FROM items WHERE
                           node_id=(SELECT id FROM nodes WHERE node=%s)""",
                        (self.id,))
+
+class LeafNode(Node, LeafNodeMixin):
+
+    implements(storage.ILeafNode)

@@ -169,13 +169,13 @@ class INode(Interface):
         @return: a deferred that returns a L{list} of L{jid.JID}s.
         """
 
-    def is_subscribed(self, subscriber):
-        """ Returns whether subscriber has a subscription to this node.
+    def is_subscribed(self, entity):
+        """ Returns whether entity has any subscription to this node.
        
         Only returns C{True} when the subscription state (if present) is
-        C{'subscribed'}.
+        C{'subscribed'} for any subscription that matches the bare JID.
 
-        @param subscriber: JID of the subscriptions' entity.
+        @param subscriber: bare JID of the subscriptions' entity.
         @type subscriber: L{jid.JID}
         @return: deferred that returns a L{bool}.
         """

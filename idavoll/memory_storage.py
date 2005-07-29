@@ -128,13 +128,13 @@ class Node:
 
         return defer.succeed(subscribers)
 
-    def is_subscribed(self, subscriber):
-        try:
-            subscription = self._subscriptions[subscriber.full()]
-        except KeyError:
-            return defer.succeed(False)
-
-        return defer.succeed(subscription.state == 'subscribed')
+    def is_subscribed(self, entity):
+        for subscriber, subscription in self._subscriptions.iteritems():
+            if jid.JID(subscriber).userhost() == entity.userhost() and \
+                    subscription.state == 'subscribed':
+                return defer.succeed(True)
+        
+        return defer.succeed(False)
 
     def get_affiliations(self):
         affiliations = [(jid.JID(entity), affiliation) for entity, affiliation
@@ -142,13 +142,11 @@ class Node:
 
         return defer.succeed(affiliations)
 
-class LeafNode(Node):
+class LeafNodeMixin:
 
-    implements(storage.ILeafNode)
     type = 'leaf'
 
-    def __init__(self, node_id, owner, config):
-        Node.__init__(self, node_id, owner, config)
+    def __init__(self):
         self._items = {}
         self._itemlist = []
 
@@ -204,6 +202,14 @@ class LeafNode(Node):
         self._itemlist = []
 
         return defer.succeed(None)
+
+class LeafNode(Node, LeafNodeMixin):
+
+    implements(storage.ILeafNode)
+
+    def __init__(self, node_id, owner, config):
+        Node.__init__(self, node_id, owner, config)
+        LeafNodeMixin.__init__(self)
 
 class Subscription:
 
