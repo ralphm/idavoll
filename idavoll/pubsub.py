@@ -153,12 +153,13 @@ class ComponentServiceFromService(Service):
 
             return defer.succeed(info)
         else:
-            try:
-                d = self.backend.get_node_type(node)
-                d.addCallback(self._add_identity, [], node)
-                d.addErrback(lambda _: [])
-            except storage.NodeNotFound:
-                return defer.succeed([])
+            def trap_not_found(result):
+                result.trap(storage.NodeNotFound)
+                return []
+
+            d = self.backend.get_node_type(node)
+            d.addCallback(self._add_identity, [], node)
+            d.addErrback(trap_not_found)
             return d
 
     def _add_identity(self, node_type, result_list, node):
@@ -169,12 +170,19 @@ class ComponentServiceFromService(Service):
 
     def _add_meta_data(self, meta_data, node_type, result_list):
         form = data_form.Form(type="result", form_type=NS_PUBSUB + "#meta-data")
+
         for meta_datum in meta_data:
-            form.add_field_single(**meta_datum)
-        form.add_field_single("text-single",
-                              "pubsub#node_type",
-                              "The type of node (collection or leaf)",
-                              node_type)
+            try:
+                del meta_datum['options']
+            except KeyError:
+                pass
+            
+            form.add_field(**meta_datum)
+
+        form.add_field("text-single",
+                       "pubsub#node_type",
+                       "The type of node (collection or leaf)",
+                       node_type)
         result_list.append(form)
         return result_list
 
@@ -376,7 +384,7 @@ class ComponentServiceFromNodeCreationService(Service):
                               form_type=NS_PUBSUB + "#node_config")
 
         for option in options:
-            form.add_field_single(**option)
+            form.add_field(**option)
 
         form.parent = configure
         configure.addChild(form)
