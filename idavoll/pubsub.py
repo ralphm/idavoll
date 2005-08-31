@@ -169,7 +169,8 @@ class ComponentServiceFromService(Service):
         return d
 
     def _add_meta_data(self, meta_data, node_type, result_list):
-        form = data_form.Form(type="result", form_type=NS_PUBSUB + "#meta-data")
+        form = data_form.Form(type="result",
+                              form_type=NS_PUBSUB + "#meta-data")
 
         for meta_datum in meta_data:
             try:
@@ -195,7 +196,9 @@ class ComponentServiceFromService(Service):
                                     for node in nodes])
         return d
 
-components.registerAdapter(ComponentServiceFromService, backend.IBackendService, component.IService)
+components.registerAdapter(ComponentServiceFromService,
+                           backend.IBackendService,
+                           component.IService)
 
 class ComponentServiceFromNotificationService(Service):
 
@@ -222,7 +225,9 @@ class ComponentServiceFromNotificationService(Service):
         items.children.extend(itemlist)
         self.send(message)
 
-components.registerAdapter(ComponentServiceFromNotificationService, backend.INotificationService, component.IService)
+components.registerAdapter(ComponentServiceFromNotificationService,
+                           backend.INotificationService,
+                           component.IService)
 
 class ComponentServiceFromPublishService(Service):
 
@@ -252,9 +257,11 @@ class ComponentServiceFromPublishService(Service):
                 items.append(child)
 
         return self.backend.publish(node, items,
-                                    jid.JID(iq["from"]).userhostJID())
+                                    jid.internJID(iq["from"]).userhostJID())
 
-components.registerAdapter(ComponentServiceFromPublishService, backend.IPublishService, component.IService)
+components.registerAdapter(ComponentServiceFromPublishService,
+                           backend.IPublishService,
+                           component.IService)
 
 class ComponentServiceFromSubscriptionService(Service):
 
@@ -278,11 +285,11 @@ class ComponentServiceFromSubscriptionService(Service):
     def _onSubscribe(self, iq):
         try:
             node_id = iq.pubsub.subscribe["node"]
-            subscriber = jid.JID(iq.pubsub.subscribe["jid"])
+            subscriber = jid.internJID(iq.pubsub.subscribe["jid"])
         except KeyError:
             raise BadRequest
 
-        requestor = jid.JID(iq["from"]).userhostJID()
+        requestor = jid.internJID(iq["from"]).userhostJID()
         d = self.backend.subscribe(node_id, subscriber, requestor)
         d.addCallback(self.return_subscription, subscriber)
         return d
@@ -302,11 +309,11 @@ class ComponentServiceFromSubscriptionService(Service):
     def _onUnsubscribe(self, iq):
         try:
             node_id = iq.pubsub.unsubscribe["node"]
-            subscriber = jid.JID(iq.pubsub.unsubscribe["jid"])
+            subscriber = jid.internJID(iq.pubsub.unsubscribe["jid"])
         except KeyError:
             raise BadRequest
 
-        requestor = jid.JID(iq["from"]).userhostJID()
+        requestor = jid.internJID(iq["from"]).userhostJID()
         return self.backend.unsubscribe(node_id, subscriber, requestor)
 
     def onOptionsGet(self, iq):
@@ -321,7 +328,9 @@ class ComponentServiceFromSubscriptionService(Service):
     def _onOptionsSet(self, iq):
         raise OptionsUnavailable
 
-components.registerAdapter(ComponentServiceFromSubscriptionService, backend.ISubscriptionService, component.IService)
+components.registerAdapter(ComponentServiceFromSubscriptionService,
+                           backend.ISubscriptionService,
+                           component.IService)
 
 class ComponentServiceFromNodeCreationService(Service):
 
@@ -348,7 +357,7 @@ class ComponentServiceFromNodeCreationService(Service):
     def _onCreate(self, iq):
         node = iq.pubsub.create.getAttribute("node")
 
-        owner = jid.JID(iq["from"]).userhostJID()
+        owner = jid.internJID(iq["from"]).userhostJID()
 
         d = self.backend.create_node(node, owner)
         d.addCallback(self._return_create_response, iq)
@@ -400,7 +409,7 @@ class ComponentServiceFromNodeCreationService(Service):
         except KeyError:
             raise BadRequest
 
-        requestor = jid.JID(iq["from"]).userhostJID()
+        requestor = jid.internJID(iq["from"]).userhostJID()
 
         for element in iq.pubsub.configure.elements():
             if element.name != 'x' or element.uri != data_form.NS_X_DATA:
@@ -434,7 +443,9 @@ class ComponentServiceFromNodeCreationService(Service):
 
         return options
 
-components.registerAdapter(ComponentServiceFromNodeCreationService, backend.INodeCreationService, component.IService)
+components.registerAdapter(ComponentServiceFromNodeCreationService,
+                           backend.INodeCreationService,
+                           component.IService)
 
 class ComponentServiceFromAffiliationsService(Service):
 
@@ -453,7 +464,8 @@ class ComponentServiceFromAffiliationsService(Service):
         self.handler_wrapper(self._onAffiliations, iq)
 
     def _onAffiliations(self, iq):
-        d = self.backend.get_affiliations(jid.JID(iq["from"]).userhostJID())
+        entity = jid.internJID(iq["from"]).userhostJID()
+        d = self.backend.get_affiliations(entity)
         d.addCallback(self._return_affiliations_response, iq)
         return d
 
@@ -468,7 +480,9 @@ class ComponentServiceFromAffiliationsService(Service):
             entity['subscription'] = r['subscription'] or 'none'
         return [reply]
 
-components.registerAdapter(ComponentServiceFromAffiliationsService, backend.IAffiliationsService, component.IService)
+components.registerAdapter(ComponentServiceFromAffiliationsService,
+                           backend.IAffiliationsService,
+                           component.IService)
 
 class ComponentServiceFromItemRetrievalService(Service):
 
@@ -508,7 +522,9 @@ class ComponentServiceFromItemRetrievalService(Service):
                 except KeyError:
                     raise BadRequest
        
-        d = self.backend.get_items(node_id, jid.JID(iq["from"]), max_items,
+        d = self.backend.get_items(node_id,
+                                   jid.internJID(iq["from"]),
+                                   max_items,
                                    item_ids)
         d.addCallback(self._return_items_response, node_id)
         return d
@@ -522,7 +538,9 @@ class ComponentServiceFromItemRetrievalService(Service):
 
         return [reply]
 
-components.registerAdapter(ComponentServiceFromItemRetrievalService, backend.IItemRetrievalService, component.IService)
+components.registerAdapter(ComponentServiceFromItemRetrievalService,
+                           backend.IItemRetrievalService,
+                           component.IService)
 
 class ComponentServiceFromRetractionService(Service):
 
@@ -557,8 +575,8 @@ class ComponentServiceFromRetractionService(Service):
                 except KeyError:
                     raise BadRequest
 
-        return self.backend.retract_item(node, item_ids,
-                                    jid.JID(iq["from"]).userhostJID())
+        requestor = jid.internJID(iq["from"]).userhostJID()
+        return self.backend.retract_item(node, item_ids, requestor)
 
     def onPurge(self, iq):
         self.handler_wrapper(self._onPurge, iq)
@@ -569,9 +587,12 @@ class ComponentServiceFromRetractionService(Service):
         except KeyError:
             raise BadRequest
 
-        return self.backend.purge_node(node, jid.JID(iq["from"]).userhostJID())
+        return self.backend.purge_node(node,
+                           jid.internJID(iq["from"]).userhostJID())
 
-components.registerAdapter(ComponentServiceFromRetractionService, backend.IRetractionService, component.IService)
+components.registerAdapter(ComponentServiceFromRetractionService,
+                           backend.IRetractionService,
+                           component.IService)
 
 class ComponentServiceFromNodeDeletionService(Service):
 
@@ -620,6 +641,9 @@ class ComponentServiceFromNodeDeletionService(Service):
         except KeyError:
             raise BadRequest
 
-        return self.backend.delete_node(node, jid.JID(iq["from"]).userhostJID())
+        return self.backend.delete_node(node,
+                            jid.internJID(iq["from"]).userhostJID())
 
-components.registerAdapter(ComponentServiceFromNodeDeletionService, backend.INodeDeletionService, component.IService)
+components.registerAdapter(ComponentServiceFromNodeDeletionService,
+                           backend.INodeDeletionService,
+                           component.IService)
