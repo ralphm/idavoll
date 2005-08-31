@@ -99,7 +99,9 @@ class Storage:
         return d
 
     def _convert_subscription_jids(self, subscriptions):
-        return [(node, jid.JID('%s/%s' % (subscriber, resource)), subscription)
+        return [(node,
+                 jid.internJID('%s/%s' % (subscriber, resource)),
+                 subscription)
                 for node, subscriber, resource, subscription in subscriptions]
 
 class Node:
@@ -256,7 +258,7 @@ class Node:
         return cursor.fetchall()
 
     def _convert_to_jids(self, list):
-        return [jid.JID("%s/%s" % (l[0], l[1])) for l in list]
+        return [jid.internJID("%s/%s" % (l[0], l[1])) for l in list]
 
     def is_subscribed(self, entity):
         return self._dbpool.runInteraction(self._is_subscribed, entity)
@@ -291,7 +293,7 @@ class Node:
                        self.id)
         result = cursor.fetchall()
         
-        return [(jid.JID(r[0]), r[1]) for r in result]
+        return [(jid.internJID(r[0]), r[1]) for r in result]
 
 class LeafNodeMixin:
 

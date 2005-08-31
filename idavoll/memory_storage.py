@@ -58,7 +58,7 @@ class Storage:
         subscriptions = []
         for node in self._nodes.itervalues():
             for subscriber, subscription in node._subscriptions.iteritems():
-                subscriber = jid.JID(subscriber)
+                subscriber = jid.internJID(subscriber)
                 if subscriber.userhostJID() == entity.userhostJID():
                     subscriptions.append((node.id, subscriber,
                                           subscription.state))
@@ -122,7 +122,7 @@ class Node:
         return defer.succeed(None)
 
     def get_subscribers(self):
-        subscribers = [jid.JID(subscriber) for subscriber, subscription
+        subscribers = [jid.internJID(subscriber) for subscriber, subscription
                        in self._subscriptions.iteritems()
                        if subscription.state == 'subscribed']
 
@@ -130,14 +130,14 @@ class Node:
 
     def is_subscribed(self, entity):
         for subscriber, subscription in self._subscriptions.iteritems():
-            if jid.JID(subscriber).userhost() == entity.userhost() and \
+            if jid.internJID(subscriber).userhost() == entity.userhost() and \
                     subscription.state == 'subscribed':
                 return defer.succeed(True)
         
         return defer.succeed(False)
 
     def get_affiliations(self):
-        affiliations = [(jid.JID(entity), affiliation) for entity, affiliation
+        affiliations = [(jid.internJID(entity), affiliation) for entity, affiliation
                        in self._affiliations.iteritems()]
 
         return defer.succeed(affiliations)
