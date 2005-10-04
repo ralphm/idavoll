@@ -1,5 +1,6 @@
 import sha
 import time
+import uuid
 from twisted.words.protocols.jabber import jid
 from twisted.application import service
 from twisted.xish import utility
@@ -71,21 +72,27 @@ class PublishService(service.Service):
     
     implements(backend.IPublishService)
 
+    def _check_auth(self, node, requestor):
+        def check(affiliation, node):
+            if affiliation not in ['owner', 'publisher']:
+                raise backend.NotAuthorized
+            return node
+
+        d = node.get_affiliation(requestor)
+        d.addCallback(check, node)
+        return d
+
     def publish(self, node_id, items, requestor):
         d = self.parent.storage.get_node(node_id)
-        d.addCallback(_get_affiliation, requestor)
+        d.addCallback(self._check_auth, requestor)
         d.addCallback(self._do_publish, items, requestor)
         return d
 
-    def _do_publish(self, result, items, requestor):
-        node, affiliation = result
+    def _do_publish(self, node, items, requestor):
         configuration = node.get_configuration()
         persist_items = configuration["pubsub#persist_items"]
         deliver_payloads = configuration["pubsub#deliver_payloads"]
         
-        if affiliation not in ['owner', 'publisher']:
-            raise backend.NotAuthorized
-
         if items and not persist_items and not deliver_payloads:
             raise backend.NoPayloadAllowed
         elif not items and (persist_items or deliver_payloads):
@@ -94,8 +101,7 @@ class PublishService(service.Service):
         if persist_items or deliver_payloads:
             for item in items:
                 if not item.getAttribute("id"):
-                    item["id"] = sha.new(str(time.time()) +
-                                         requestor.full()).hexdigest()
+                    item["id"] = uuid.generate() 
 
         if persist_items:
             d = node.store_items(items, requestor)
@@ -140,7 +146,7 @@ class SubscriptionService(service.Service):
     def subscribe(self, node_id, subscriber, requestor):
         subscriber_entity = subscriber.userhostJID()
         if subscriber_entity != requestor:
-            return defer.fail(backend.NotAuthorized)
+            return defer.fail(backend.NotAuthorized())
 
         d = self.parent.storage.get_node(node_id)
         d.addCallback(_get_affiliation, subscriber_entity)
@@ -185,9 +191,7 @@ class NodeCreationService(service.Service):
 
     def create_node(self, node_id, requestor):
         if not node_id:
-            node_id = 'generic/%s' % sha.new(str(time.time()) +
-                                             requestor.full()).hexdigest()
-
+            node_id = 'generic/%s' % uuid.generate() 
         d = self.parent.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
         return d
