@@ -21,8 +21,11 @@ plus most optional features, as returned by Service Discovery.
 Requirements
 ============
 
-- Twisted >= 2.0.0
-- A jabber server like jabberd 1.4.x
+- Twisted Core >= 2.0.0
+- Twisted Xish >= 0.1.0
+- Twisted Words >= 0.1.0
+- uuid.py (http://ofxsuite.berlios.de/uuid.py)
+- A jabber server that supports the component protocol (JEP-0114)
 
 For the PostgreSQL backend, the following is also required:
 
