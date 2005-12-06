@@ -1,4 +1,4 @@
-from twisted.xish import domish
+from twisted.words.xish import domish
 
 NS = 'http://jabber.org/protocol/disco'
 NS_INFO = NS + '#info'

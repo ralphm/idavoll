@@ -1,6 +1,6 @@
 from zope.interface import Interface
 from twisted.words.protocols.jabber import jid
-from twisted.xish import domish
+from twisted.words.xish import domish
 
 class Error(Exception):
     msg = None

@@ -2,8 +2,8 @@ import sha
 import time
 import uuid
 from twisted.words.protocols.jabber import jid
+from twisted.words.xish import utility
 from twisted.application import service
-from twisted.xish import utility
 from twisted.internet import defer
 from zope.interface import implements
 import backend, storage

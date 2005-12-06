@@ -1,4 +1,4 @@
-from twisted.xish import domish
+from twisted.words.xish import domish
 
 NS_X_DATA = 'jabber:x:data'
 
