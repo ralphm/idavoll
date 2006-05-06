@@ -39,11 +39,12 @@ PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
 PUBSUB_CONFIGURE_GET = PUBSUB_OWNER_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_OWNER_SET + '/configure'
+PUBSUB_SUBSCRIPTIONS = PUBSUB_GET + '/subscriptions'
 PUBSUB_AFFILIATIONS = PUBSUB_GET + '/affiliations'
 PUBSUB_ITEMS = PUBSUB_GET + '/items'
 PUBSUB_RETRACT = PUBSUB_SET + '/retract'
-PUBSUB_PURGE = PUBSUB_SET + '/purge'
-PUBSUB_DELETE = PUBSUB_SET + '/delete'
+PUBSUB_PURGE = PUBSUB_OWNER_SET + '/purge'
+PUBSUB_DELETE = PUBSUB_OWNER_SET + '/delete'
 
 class Error(Exception):
     pubsub_error = None
@@ -270,12 +271,14 @@ class ComponentServiceFromSubscriptionService(Service):
         xmlstream.addObserver(PUBSUB_UNSUBSCRIBE, self.onUnsubscribe)
         xmlstream.addObserver(PUBSUB_OPTIONS_GET, self.onOptionsGet)
         xmlstream.addObserver(PUBSUB_OPTIONS_SET, self.onOptionsSet)
+        xmlstream.addObserver(PUBSUB_SUBSCRIPTIONS, self.onSubscriptions)
     
     def get_disco_info(self, node):
         info = []
 
         if not node:
             info.append(disco.Feature(NS_PUBSUB + '#subscribe'))
+            info.append(disco.Feature(NS_PUBSUB + '#retrieve-subscriptions'))
 
         return defer.succeed(info)
 
@@ -295,12 +298,13 @@ class ComponentServiceFromSubscriptionService(Service):
         return d
 
     def return_subscription(self, result, subscriber):
+        node, state = result
+
         reply = domish.Element((NS_PUBSUB, "pubsub"))
-        entity = reply.addElement("entity")
-        entity["node"] = result["node"]
-        entity["jid"] = subscriber.full()
-        entity["affiliation"] = result["affiliation"] or 'none'
-        entity["subscription"] = result["state"]
+        subscription = reply.addElement("subscription")
+        subscription["node"] = nod
+        subscription["jid"] = subscriber.full()
+        subscription["subscription"] = state
         return [reply]
 
     def onUnsubscribe(self, iq):
@@ -327,6 +331,25 @@ class ComponentServiceFromSubscriptionService(Service):
 
     def _onOptionsSet(self, iq):
         raise OptionsUnavailable
+
+    def onSubscriptions(self, iq):
+        self.handler_wrapper(self._onSubscriptions, iq)
+
+    def _onSubscriptions(self, iq):
+        entity = jid.internJID(iq["from"]).userhostJID()
+        d = self.backend.get_subscriptions(entity)
+        d.addCallback(self._return_subscriptions_response, iq)
+        return d
+
+    def _return_subscriptions_response(self, result, iq):
+        reply = domish.Element((NS_PUBSUB, 'pubsub'))
+        subscriptions = reply.addElement('subscriptions')
+        for node, subscriber, state in result:
+            item = subscriptions.addElement('subscription')
+            item['node'] = node
+            item['jid'] = subscriber.full()
+            item['subscription'] = state
+        return [reply]
 
 components.registerAdapter(ComponentServiceFromSubscriptionService,
                            backend.ISubscriptionService,
@@ -472,12 +495,10 @@ class ComponentServiceFromAffiliationsService(Service):
     def _return_affiliations_response(self, result, iq):
         reply = domish.Element((NS_PUBSUB, 'pubsub'))
         affiliations = reply.addElement('affiliations')
-        for r in result:
-            entity = affiliations.addElement('entity')
-            entity['node'] = r['node']
-            entity['jid'] = r['jid'].full()
-            entity['affiliation'] = r['affiliation'] or 'none'
-            entity['subscription'] = r['subscription'] or 'none'
+        for node, affiliation in result:
+            item = affiliations.addElement('affiliation')
+            item['node'] = node
+            item['affiliation'] = affiliation
         return [reply]
 
 components.registerAdapter(ComponentServiceFromAffiliationsService,

@@ -34,7 +34,7 @@ class InvalidConfigurationValue(Error):
 class IBackendService(Interface):
     """ Interface to a backend service of a pubsub service. """
 
-    def __init__(self, storage):
+    def __init__(storage):
         """
         @param storage: L{storage} object.
         """
@@ -57,7 +57,7 @@ class IBackendService(Interface):
         @rtype: C{bool}
         """
 
-    def get_node_type(self, node_id):
+    def get_node_type(node_id):
         """ Return type of a node.
 
         @return: a deferred that returns either 'leaf' or 'collection'
@@ -69,7 +69,7 @@ class IBackendService(Interface):
         @return: a deferred that returns a C{list} of node ids.
         """
 
-    def get_node_meta_data(self, node_id):
+    def get_node_meta_data(node_id):
         """ Return meta data for a node.
 
         @return: a deferred that returns a C{list} of C{dict}s with the
@@ -79,7 +79,7 @@ class IBackendService(Interface):
 class INodeCreationService(Interface):
     """ A service for creating nodes """
 
-    def create_node(self, node_id, requestor):
+    def create_node(node_id, requestor):
         """ Create a node.
         
         @return: a deferred that fires when the node has been created.
@@ -88,7 +88,7 @@ class INodeCreationService(Interface):
 class INodeDeletionService(Interface):
     """ A service for deleting nodes. """
 
-    def register_pre_delete(self, pre_delete_fn):
+    def register_pre_delete(pre_delete_fn):
         """ Register a callback that is called just before a node deletion.
         
         The function C{pre_deleted_fn} is added to a list of functions
@@ -107,13 +107,13 @@ class INodeDeletionService(Interface):
         deferred is returned in the list of deferreds.
         """
 
-    def get_subscribers(self, node_id):
+    def get_subscribers(node_id):
         """ Get node subscriber list.
         
         @return: a deferred that fires with the list of subscribers.
         """
 
-    def delete_node(self, node_id, requestor):
+    def delete_node(node_id, requestor):
         """ Delete a node.
         
         @return: a deferred that fires when the node has been deleted.
@@ -122,7 +122,7 @@ class INodeDeletionService(Interface):
 class IPublishService(Interface):
     """ A service for publishing items to a node. """
 
-    def publish(self, node_id, items, requestor):
+    def publish(node_id, items, requestor):
         """ Publish items to a pubsub node.
         
         @return: a deferred that fires when the items have been published.
@@ -130,16 +130,16 @@ class IPublishService(Interface):
 class INotificationService(Interface):
     """ A service for notification of published items. """
 
-    def register_notifier(self, observerfn, *args, **kwargs):
+    def register_notifier(observerfn, *args, **kwargs):
         """ Register callback which is called for notification. """
 
-    def get_notification_list(self, node_id, items):
+    def get_notification_list(node_id, items):
         pass
 
 class ISubscriptionService(Interface):
     """ A service for managing subscriptions. """
 
-    def subscribe(self, node_id, subscriber, requestor):
+    def subscribe(node_id, subscriber, requestor):
         """ Request the subscription of an entity to a pubsub node.
 
         Depending on the node's configuration and possible business rules, the
@@ -151,7 +151,7 @@ class ISubscriptionService(Interface):
         @return: a deferred that returns the subscription state
         """
 
-    def unsubscribe(self, node_id, subscriber, requestor):
+    def unsubscribe(node_id, subscriber, requestor):
         """ Cancel the subscription of an entity to a pubsub node.
 
         The subscription of C{subscriber} is removed from the list of
@@ -162,33 +162,42 @@ class ISubscriptionService(Interface):
         @return: a deferred that fires when unsubscription is complete.
         """
 
+    def get_subscriptions(entity):
+        """ Report the list of current subscriptions with this pubsub service.
+
+        Report the list of the current subscriptions with all nodes within this
+        pubsub service, for the C{entity}.
+
+        @return: a deferred that returns the list of all current subscriptions
+                 as tuples C{(node_id, subscriber, subscription)}.
+        """
+
 class IAffiliationsService(Interface):
     """ A service for retrieving the affiliations with this pubsub service. """
 
-    def get_affiliations(self, entity):
+    def get_affiliations(entity):
         """ Report the list of current affiliations with this pubsub service.
 
         Report the list of the current affiliations with all nodes within this
-        pubsub service, along with subscriptions to such nodes, for the
-        C{entity}.
+        pubsub service, for the C{entity}.
 
         @return: a deferred that returns the list of all current affiliations
-        and subscriptions.
+                 as tuples C{(node_id, affiliation)}.
         """
 
 class IRetractionService(Interface):
     """ A service for retracting published items """
 
-    def retract_item(self, node_id, item_id, requestor):
+    def retract_item(node_id, item_id, requestor):
         """ Removes item in node from persistent storage """
 
-    def purge_node(self, node_id, requestor):
+    def purge_node(node_id, requestor):
         """ Removes all items in node from persistent storage """
 
 class IItemRetrievalService(Interface):
     """ A service for retrieving previously published items. """
 
-    def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
+    def get_items(node_id, requestor, max_items=None, item_ids=[]):
         """ Retrieve items from persistent storage
 
         If C{max_items} is given, return the C{max_items} last published

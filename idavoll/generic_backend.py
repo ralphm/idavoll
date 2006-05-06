@@ -162,17 +162,15 @@ class SubscriptionService(service.Service):
         d = node.add_subscription(subscriber, 'subscribed')
         d.addCallback(lambda _: 'subscribed')
         d.addErrback(self._get_subscription, node, subscriber)
-        d.addCallback(self._return_subscription, affiliation, node.id)
+        d.addCallback(self._return_subscription, node.id)
         return d
 
     def _get_subscription(self, failure, node, subscriber):
         failure.trap(storage.SubscriptionExists)
         return node.get_subscription(subscriber)
 
-    def _return_subscription(self, result, affiliation, node_id):
-        return {'affiliation': affiliation,
-                'node': node_id,
-                'state': result}
+    def _return_subscription(self, result, node_id):
+        return node_id, result
 
     def unsubscribe(self, node_id, subscriber, requestor):
         if subscriber.userhostJID() != requestor:
@@ -181,6 +179,9 @@ class SubscriptionService(service.Service):
         d = self.parent.storage.get_node(node_id)
         d.addCallback(lambda node: node.remove_subscription(subscriber))
         return d
+
+    def get_subscriptions(self, entity):
+        return self.parent.storage.get_subscriptions(entity)
 
 class NodeCreationService(service.Service):
 
@@ -246,37 +247,7 @@ class AffiliationsService(service.Service):
     implements(backend.IAffiliationsService)
 
     def get_affiliations(self, entity):
-        d1 = self.parent.storage.get_affiliations(entity)
-        d2 = self.parent.storage.get_subscriptions(entity)
-        d = defer.DeferredList([d1, d2], fireOnOneErrback=1, consumeErrors=1)
-        d.addErrback(lambda x: x.value[0])
-        d.addCallback(self._affiliations_result, entity)
-        return d
-
-    def _affiliations_result(self, result, entity):
-        affiliations = result[0][1]
-        subscriptions = result[1][1]
-
-        new_affiliations = {}
-
-        for node, affiliation in affiliations:
-            new_affiliations[(node, entity.full())] = {'node': node,
-                                                'jid': entity,
-                                                'affiliation': affiliation,
-                                                'subscription': None
-                                               }
-
-        for node, subscriber, subscription in subscriptions:
-            key = node, subscriber.full()
-            if new_affiliations.has_key(key):
-                new_affiliations[key]['subscription'] = subscription
-            else:
-                new_affiliations[key] = {'node': node,
-                                         'jid': subscriber,
-                                         'affiliation': None,
-                                         'subscription': subscription}
-
-        return new_affiliations.values()
+        return self.parent.storage.get_affiliations(entity)
 
 class ItemRetrievalService(service.Service):
 
