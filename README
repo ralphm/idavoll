@@ -15,15 +15,14 @@ Current Status
 There are two different backends: one using PostgreSQL for storage, and one
 just keeping everything in memory.
 
-In Idavoll the mimimal requirements of JEP-0060 version 1.7 are implemented
+In Idavoll the mimimal requirements of JEP-0060 version 1.8 are implemented
 plus most optional features, as returned by Service Discovery.
 
 Requirements
 ============
 
 - Twisted Core >= 2.0.0
-- Twisted Xish >= 0.1.0
-- Twisted Words >= 0.1.0
+- Twisted Words >= 0.3.0
 - uuid.py (http://ofxsuite.berlios.de/uuid.py)
 - A jabber server that supports the component protocol (JEP-0114)
 
@@ -46,6 +45,13 @@ For jabberd 1.4 configuration, put the following in jabber.xml:
   </service>
 
 and restart jabberd.
+
+For jabberd 2.x, you can use the 'legacy' component support that defaults
+to port 5347. You do not need to add anything specific for this service.
+
+For other server implementations, please refer to its documentation on
+how to interact with server side components using the protocol defined in
+JEP-0114.
 
 Then, in the same directory as this file run:
 

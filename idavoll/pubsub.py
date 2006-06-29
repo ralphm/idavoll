@@ -302,7 +302,7 @@ class ComponentServiceFromSubscriptionService(Service):
 
         reply = domish.Element((NS_PUBSUB, "pubsub"))
         subscription = reply.addElement("subscription")
-        subscription["node"] = nod
+        subscription["node"] = node
         subscription["jid"] = subscriber.full()
         subscription["subscription"] = state
         return [reply]
