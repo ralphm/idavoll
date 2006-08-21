@@ -1,13 +1,12 @@
-Idavoll using Twisted Python.
+Idavoll 0.5.0
 
-What is Idavoll?
+What is this?
 ================
 
-A pubsub service, as defined in JEP-0060, aiming to be fully compliant and
-mostly complete. The goal is to build a /generic/ pubsub service, but of which
-parts can be reused for building custom pubsub services for specific
-applications.
-
+	Idavoll is a Jabber publish-subscribe service component, as defined in
+	JEP-0060, aiming to be fully compliant and mostly complete. The goal is to
+	build a generic pubsub service, but of which parts can be reused for
+	building custom pubsub services for specific applications.
 
 Current Status
 ==============
@@ -18,64 +17,19 @@ just keeping everything in memory.
 In Idavoll the mimimal requirements of JEP-0060 version 1.8 are implemented
 plus most optional features, as returned by Service Discovery.
 
-Requirements
-============
+Installing
+==========
 
-- Twisted Core >= 2.0.0
-- Twisted Words >= 0.3.0
-- uuid.py (http://ofxsuite.berlios.de/uuid.py)
-- A jabber server that supports the component protocol (JEP-0114)
+	Instructions for installing, configuring and running this software are in
+	INSTALL.
 
-For the PostgreSQL backend, the following is also required:
+Copyright
+=========
 
-- PostgreSQL
-- pyPgSQL
+  All of the code in this distribution is Copyright (c) 2003-2006 Ralph Meijer
 
-Usage
-=====
-
-For jabberd 1.4 configuration, put the following in jabber.xml:
-
-  <service id='pubsub.localhost'>
-    <accept>
-      <ip>127.0.0.1</ip>
-      <port>1238</port>
-      <secret>mysecret</secret>
-    </accept>
-  </service>
-
-and restart jabberd.
-
-For jabberd 2.x, you can use the 'legacy' component support that defaults
-to port 5347. You do not need to add anything specific for this service.
-
-For other server implementations, please refer to its documentation on
-how to interact with server side components using the protocol defined in
-JEP-0114.
-
-Then, in the same directory as this file run:
-
-  mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238
-  twistd -rf idavoll.tap
-
-This uses the (default) memory based backend. You can ignore the deprecation
-warnings.
-
-For using the PostgreSQL backend, create a database (for example named pubsub)
-like so:
-
-  createdb pubsub
-  psql pubsub <db/pubsub.db
-
-Then do:
-
-  mktap idavoll --rport=1238 --jid=pubsub.localhost --secret=1238 \
-                --backend=pgsql
-  twistd -rf idavoll.tap
-
-For viewing all options, run:
-
-  mktap idavoll --help
+  Idavoll is made available under the MIT license. The included LICENSE file
+	describes this in detail.
 
 Contact
 =======

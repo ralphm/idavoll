@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 from twisted.words.protocols.jabber import component,jid
 from twisted.words.xish import utility, domish
 from twisted.python import components

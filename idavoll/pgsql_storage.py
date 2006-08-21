@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 import copy
 import storage
 from twisted.enterprise import adbapi

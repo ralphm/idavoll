@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 from twisted.words.xish import domish
 
 NS = 'http://jabber.org/protocol/disco'

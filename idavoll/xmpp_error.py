@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 NS_XMPP_STANZAS = "urn:ietf:params:xml:ns:xmpp-stanzas"
 
 conditions = {

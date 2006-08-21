@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 from twisted.words.protocols.jabber import component
 from twisted.application import service
 from twisted.internet import defer
@@ -8,7 +11,7 @@ import disco
 
 import sys
 
-__version__ = '0.2'
+__version__ = '0.5.0'
 
 NS_VERSION = 'jabber:iq:version'
 

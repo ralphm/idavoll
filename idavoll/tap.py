@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 from twisted.application import internet, service
 from twisted.internet import interfaces
 from twisted.python import usage
@@ -6,9 +9,9 @@ import idavoll
 class Options(usage.Options):
 	optParameters = [
 		('jid', None, 'pubsub'),
-		('secret', None, None),
+		('secret', None, 'secret'),
 		('rhost', None, '127.0.0.1'),
-		('rport', None, '6000'),
+		('rport', None, '5347'),
 		('backend', None, 'memory'),
 		('dbuser', None, ''),
 		('dbname', None, 'pubsub'),

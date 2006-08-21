@@ -1,3 +1,0 @@
-register("Idavoll", "idavoll.tap",
-         description="Jabber Publish Subscribe Component",
-         type='tap', tapname='idavoll')

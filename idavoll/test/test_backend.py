@@ -1,3 +1,6 @@
+# Copyright (c) 2003-2006 Ralph Meijer
+# See LICENSE for details.
+
 from twisted.trial import unittest
 from twisted.trial.assertions import *
 from zope.interface import implements

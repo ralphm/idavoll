@@ -1,0 +1,92 @@
+Requirements
+============
+
+- Twisted Core >= 2.0.0
+- Twisted Words >= 0.3.0
+- uuid.py (http://ofxsuite.berlios.de/uuid.py)
+- A jabber server that supports the component protocol (JEP-0114)
+
+For the PostgreSQL backend, the following is also required:
+
+- PostgreSQL
+- pyPgSQL
+
+Installation
+============
+
+Run:
+
+  python setup.py install
+
+Configuration
+=============
+
+The configuration file is created using Twisted's mktap, which needs a number
+of parameters:
+
+ --jid: The Jabber ID the component will assume.
+ --rport: the port number of the Jabber server to connect to
+ --secret: the secret used to authenticate with the Jabber server.
+ --backend: the backend storage facility to be used (memory or PostgreSQL).
+
+The default settings of mktap for Idavoll use the memory database and assume
+the default settings of jabberd 2.x for --rport and --secret.
+
+jabberd 2.x
+===========
+You can use the 'legacy' component support that defaults to port 5347 with
+secret 'secret'. You do not need to add anything specific for this service.
+
+jabberd 1.4.x
+=============
+
+Put the following in the jabber.xml configuration file of jabberd:
+
+  <service id='pubsub.localhost'>
+    <accept>
+      <ip>127.0.0.1</ip>
+      <port>5347</port>
+      <secret>secret</secret>
+    </accept>
+  </service>
+
+and restart jabberd. Unlike jabber 2.x, you can only have one component per
+port, so the port number may need to be changed.
+
+For other server implementations, please refer to its documentation on
+how to interact with server side components using the protocol defined in
+JEP-0114.
+
+Then, in the same directory as this file run:
+
+  mktap idavoll --rport=5347 --jid=pubsub.localhost --secret=secret
+
+This uses the (default) memory based backend.
+
+For using the PostgreSQL backend, create a database (for example named pubsub)
+like so:
+
+  createdb pubsub
+  psql pubsub <db/pubsub.sql
+
+To use this backend, add the --backend=pgsql parameter to mktap.
+
+For viewing all options, run:
+
+  mktap idavoll --help
+
+The generated file idavoll.tap now holds the configuration.
+
+Running
+=======
+
+Using the configuration file idavoll.tap, run:
+
+  twistd -of idavoll.tap
+
+This will start the service and run it in the background. It generates a
+file twistd.pid that holds the PID of the service and a log file twistd.log.
+The twistd utility has a fair number of options that might be useful, and
+can be viewed with:
+
+  twistd --help
