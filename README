@@ -3,10 +3,10 @@ Idavoll 0.5.0
 What is this?
 ================
 
-	Idavoll is a Jabber publish-subscribe service component, as defined in
-	JEP-0060, aiming to be fully compliant and mostly complete. The goal is to
-	build a generic pubsub service, but of which parts can be reused for
-	building custom pubsub services for specific applications.
+Idavoll is a Jabber publish-subscribe service component, as defined in
+JEP-0060, aiming to be fully compliant and mostly complete. The goal is to
+build a generic pubsub service, but of which parts can be reused for building
+custom pubsub services for specific applications.
 
 Current Status
 ==============
@@ -20,16 +20,16 @@ plus most optional features, as returned by Service Discovery.
 Installing
 ==========
 
-	Instructions for installing, configuring and running this software are in
-	INSTALL.
+Instructions for installing, configuring and running this software are in
+INSTALL.
 
 Copyright
 =========
 
-  All of the code in this distribution is Copyright (c) 2003-2006 Ralph Meijer
+All of the code in this distribution is Copyright (c) 2003-2006 Ralph Meijer.
 
-  Idavoll is made available under the MIT license. The included LICENSE file
-	describes this in detail.
+Idavoll is made available under the MIT license. The included LICENSE file
+describes this in detail.
 
 Contact
 =======
