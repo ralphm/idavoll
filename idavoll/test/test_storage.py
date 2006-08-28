@@ -2,10 +2,9 @@
 # See LICENSE for details.
 
 from twisted.trial import unittest
-from twisted.trial.assertions import *
 from twisted.words.protocols.jabber import jid
 from twisted.internet import defer
-from twisted.xish import domish
+from twisted.words.xish import domish
 
 from idavoll import storage, pubsub
 
@@ -49,19 +48,19 @@ class StorageTests:
 
     def testGetNonExistingNode(self):
         d = self.s.get_node('non-existing')
-        assertFailure(d, storage.NodeNotFound)
+        self.assertFailure(d, storage.NodeNotFound)
         return d
 
     def testGetNodeIDs(self):
         def cb(node_ids):
-            assertIn('pre-existing', node_ids)
-            assertNotIn('non-existing', node_ids)
+            self.assertIn('pre-existing', node_ids)
+            self.assertNotIn('non-existing', node_ids)
 
         return self.s.get_node_ids().addCallback(cb)
 
     def testCreateExistingNode(self):
         d = self.s.create_node('pre-existing', OWNER)
-        assertFailure(d, storage.NodeExists)
+        self.assertFailure(d, storage.NodeExists)
         return d
 
     def testCreateNode(self):
@@ -75,13 +74,13 @@ class StorageTests:
 
     def testDeleteNonExistingNode(self):
         d = self.s.delete_node('non-existing')
-        assertFailure(d, storage.NodeNotFound)
+        self.assertFailure(d, storage.NodeNotFound)
         return d
 
     def testDeleteNode(self):
         def cb(void):
             d = self.s.get_node('to-be-deleted')
-            assertFailure(d, storage.NodeNotFound)
+            self.assertFailure(d, storage.NodeNotFound)
             return d
 
         d = self.s.delete_node('to-be-deleted')
@@ -90,7 +89,7 @@ class StorageTests:
 
     def testGetAffiliations(self):
         def cb(affiliations):
-            assertIn(('pre-existing', 'owner'), affiliations)
+            self.assertIn(('pre-existing', 'owner'), affiliations)
 
         d = self.s.get_affiliations(OWNER)
         d.addCallback(cb)
@@ -98,7 +97,7 @@ class StorageTests:
 
     def testGetSubscriptions(self):
         def cb(subscriptions):
-            assertIn(('pre-existing', SUBSCRIBER, 'subscribed'), subscriptions)
+            self.assertIn(('pre-existing', SUBSCRIBER, 'subscribed'), subscriptions)
         
         d = self.s.get_subscriptions(SUBSCRIBER)
         d.addCallback(cb)
@@ -107,14 +106,14 @@ class StorageTests:
     # Node tests
 
     def testGetType(self):
-        assertEqual(self.node.get_type(), 'leaf')
+        self.assertEqual(self.node.get_type(), 'leaf')
 
     def testGetConfiguration(self):
         config = self.node.get_configuration()
-        assertIn('pubsub#persist_items', config.iterkeys())
-        assertIn('pubsub#deliver_payloads', config.iterkeys())
-        assertEqual(config['pubsub#persist_items'], True)
-        assertEqual(config['pubsub#deliver_payloads'], True)
+        self.assertIn('pubsub#persist_items', config.iterkeys())
+        self.assertIn('pubsub#deliver_payloads', config.iterkeys())
+        self.assertEqual(config['pubsub#persist_items'], True)
+        self.assertEqual(config['pubsub#deliver_payloads'], True)
 
     def testSetConfiguration(self):
         def get_config(node):
@@ -124,14 +123,14 @@ class StorageTests:
 
         def check_object_config(node):
             config = node.get_configuration()
-            assertEqual(config['pubsub#persist_items'], False)
+            self.assertEqual(config['pubsub#persist_items'], False)
         
         def get_node(void):
             return self.s.get_node('to-be-reconfigured')
 
         def check_storage_config(node):
             config = node.get_configuration()
-            assertEqual(config['pubsub#persist_items'], False)
+            self.assertEqual(config['pubsub#persist_items'], False)
 
         d = self.s.get_node('to-be-reconfigured')
         d.addCallback(get_config)
@@ -143,14 +142,14 @@ class StorageTests:
     def testGetMetaData(self):
         meta_data = self.node.get_meta_data()
         for key, value in self.node.get_configuration().iteritems():
-            assertIn(key, meta_data.iterkeys())
-            assertEqual(value, meta_data[key])
-        assertIn('pubsub#node_type', meta_data.iterkeys())
-        assertEqual(meta_data['pubsub#node_type'], 'leaf')
+            self.assertIn(key, meta_data.iterkeys())
+            self.assertEqual(value, meta_data[key])
+        self.assertIn('pubsub#node_type', meta_data.iterkeys())
+        self.assertEqual(meta_data['pubsub#node_type'], 'leaf')
 
     def testGetAffiliation(self):
         def cb(affiliation):
-            assertEqual(affiliation, 'owner')
+            self.assertEqual(affiliation, 'owner')
 
         d = self.node.get_affiliation(OWNER)
         d.addCallback(cb)
@@ -158,7 +157,7 @@ class StorageTests:
 
     def testGetNonExistingAffiliation(self):
         def cb(affiliation):
-            assertEqual(affiliation, None)
+            self.assertEqual(affiliation, None)
 
         d = self.node.get_affiliation(SUBSCRIBER)
         d.addCallback(cb)
@@ -169,7 +168,7 @@ class StorageTests:
             return self.node.get_subscription(SUBSCRIBER_NEW)
 
         def cb2(state):
-            assertEqual(state, 'pending')
+            self.assertEqual(state, 'pending')
 
         d = self.node.add_subscription(SUBSCRIBER_NEW, 'pending')
         d.addCallback(cb1)
@@ -178,14 +177,14 @@ class StorageTests:
 
     def testAddExistingSubscription(self):
         d = self.node.add_subscription(SUBSCRIBER, 'pending')
-        assertFailure(d, storage.SubscriptionExists)
+        self.assertFailure(d, storage.SubscriptionExists)
         return d
     
     def testGetSubscription(self):
         def cb(subscriptions):
-            assertEquals(subscriptions[0][1], 'subscribed')
-            assertEquals(subscriptions[1][1], 'pending')
-            assertEquals(subscriptions[2][1], None)
+            self.assertEquals(subscriptions[0][1], 'subscribed')
+            self.assertEquals(subscriptions[1][1], 'pending')
+            self.assertEquals(subscriptions[2][1], None)
 
         d = defer.DeferredList([self.node.get_subscription(SUBSCRIBER),
                                 self.node.get_subscription(SUBSCRIBER_PENDING),
@@ -198,14 +197,14 @@ class StorageTests:
 
     def testRemoveNonExistingSubscription(self):
         d = self.node.remove_subscription(OWNER)
-        assertFailure(d, storage.SubscriptionNotFound)
+        self.assertFailure(d, storage.SubscriptionNotFound)
         return d
     
     def testGetSubscribers(self):
         def cb(subscribers):
-            assertIn(SUBSCRIBER, subscribers)
-            assertNotIn(SUBSCRIBER_PENDING, subscribers)
-            assertNotIn(OWNER, subscribers)
+            self.assertIn(SUBSCRIBER, subscribers)
+            self.assertNotIn(SUBSCRIBER_PENDING, subscribers)
+            self.assertNotIn(OWNER, subscribers)
 
         d = self.node.get_subscribers()
         d.addCallback(cb)
@@ -213,10 +212,10 @@ class StorageTests:
 
     def testIsSubscriber(self):
         def cb(subscribed):
-            assertEquals(subscribed[0][1], True)
-            assertEquals(subscribed[1][1], True)
-            assertEquals(subscribed[2][1], False)
-            assertEquals(subscribed[3][1], False)
+            self.assertEquals(subscribed[0][1], True)
+            self.assertEquals(subscribed[1][1], True)
+            self.assertEquals(subscribed[2][1], False)
+            self.assertEquals(subscribed[3][1], False)
 
         d = defer.DeferredList([self.node.is_subscribed(SUBSCRIBER),
                                 self.node.is_subscribed(SUBSCRIBER.userhostJID()),
@@ -230,7 +229,7 @@ class StorageTests:
             return self.node.get_items_by_id(['new'])
 
         def cb2(result):
-            assertEqual(result[0], decode(ITEM_NEW.toXml()))
+            self.assertEqual(result[0], decode(ITEM_NEW.toXml()))
 
         d = self.node.store_items([ITEM_NEW], PUBLISHER)
         d.addCallback(cb1)
@@ -242,7 +241,7 @@ class StorageTests:
             return self.node.get_items_by_id(['current'])
 
         def cb2(result):
-            assertEqual(result[0], decode(ITEM_UPDATED.toXml()))
+            self.assertEqual(result[0], decode(ITEM_UPDATED.toXml()))
 
         d = self.node.store_items([ITEM_UPDATED], PUBLISHER)
         d.addCallback(cb1)
@@ -251,11 +250,11 @@ class StorageTests:
 
     def testRemoveItems(self):
         def cb1(result):
-            assertEqual(result, ['to-be-deleted'])
+            self.assertEqual(result, ['to-be-deleted'])
             return self.node.get_items_by_id(['to-be-deleted'])
 
         def cb2(result):
-            assertEqual(len(result), 0)
+            self.assertEqual(len(result), 0)
 
         d = self.node.remove_items(['to-be-deleted'])
         d.addCallback(cb1)
@@ -264,7 +263,7 @@ class StorageTests:
 
     def testRemoveNonExistingItems(self):
         def cb(result):
-            assertEqual(result, [])
+            self.assertEqual(result, [])
 
         d = self.node.remove_items(['non-existing'])
         d.addCallback(cb)
@@ -272,7 +271,7 @@ class StorageTests:
 
     def testGetItems(self):
         def cb(result):
-            assertIn(decode(ITEM.toXml()), result)
+            self.assertIn(decode(ITEM.toXml()), result)
 
         d = self.node.get_items()
         d.addCallback(cb)
@@ -280,7 +279,7 @@ class StorageTests:
 
     def testLastItem(self):
         def cb(result):
-            assertEqual([decode(ITEM.toXml())], result)
+            self.assertEqual([decode(ITEM.toXml())], result)
 
         d = self.node.get_items(1)
         d.addCallback(cb)
@@ -288,7 +287,7 @@ class StorageTests:
 
     def testGetItemsById(self):
         def cb(result):
-            assertEqual(len(result), 1)
+            self.assertEqual(len(result), 1)
 
         d = self.node.get_items_by_id(['current'])
         d.addCallback(cb)
@@ -296,7 +295,7 @@ class StorageTests:
 
     def testGetNonExistingItemsById(self):
         def cb(result):
-            assertEqual(len(result), 0)
+            self.assertEqual(len(result), 0)
 
         d = self.node.get_items_by_id(['non-existing'])
         d.addCallback(cb)
@@ -312,7 +311,7 @@ class StorageTests:
             return node.get_items()
         
         def cb3(result):
-            assertEqual([], result)
+            self.assertEqual([], result)
 
         d = self.s.get_node('to-be-purged')
         d.addCallback(cb1)
@@ -326,7 +325,7 @@ class StorageTests:
 
         def cb2(affiliations):
             affiliations = dict(((a[0].full(), a[1]) for a in affiliations))
-            assertEquals(affiliations[OWNER.full()], 'owner')
+            self.assertEquals(affiliations[OWNER.full()], 'owner')
         
         d = self.s.get_node('pre-existing')
         d.addCallback(cb1)

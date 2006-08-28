@@ -2,7 +2,6 @@
 # See LICENSE for details.
 
 from twisted.trial import unittest
-from twisted.trial.assertions import *
 from zope.interface import implements
 from twisted.internet import defer
 from twisted.words.protocols.jabber import jid
@@ -45,8 +44,8 @@ class NodeDeletionServiceTests:
             return defer.succeed(None)
 
         def cb(result):
-            assert_(self.pre_delete_called)
-            assert_(self.delete_called)
+            self.assert_(self.pre_delete_called)
+            self.assert_(self.delete_called)
 
         self.backend.register_pre_delete(pre_delete)
         d = self.backend.delete_node('to-be-deleted', OWNER)
