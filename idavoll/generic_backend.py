@@ -265,20 +265,15 @@ class ItemRetrievalService(service.Service):
 
     def get_items(self, node_id, requestor, max_items=None, item_ids=[]):
         d = self.parent.storage.get_node(node_id)
-        d.addCallback(self._is_subscribed, requestor)
+        d.addCallback(_get_affiliation, requestor)
         d.addCallback(self._do_get_items, max_items, item_ids)
         return d
 
-    def _is_subscribed(self, node, subscriber):
-        d = node.is_subscribed(subscriber)
-        d.addCallback(lambda subscribed: (node, subscribed))
-        return d
-
     def _do_get_items(self, result, max_items, item_ids):
-        node, subscribed = result
+        node, affiliation = result
 
-        if not subscribed:
-            raise backend.NotSubscribed
+        if affiliation == 'outcast':
+            raise backend.Forbidden
 
         if item_ids:
             return node.get_items_by_id(item_ids)
