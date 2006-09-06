@@ -10,19 +10,16 @@ class Error(Exception):
     def __str__(self):
         return self.msg
     
-class NotAuthorized(Error):
+class Forbidden(Error):
     pass
 
-class PayloadExpected(Error):
-    msg = 'Payload expected'
+class ItemForbidden(Error):
+    pass
 
-class NoPayloadAllowed(Error):
-    msg = 'No payload allowed'
+class ItemRequired(Error):
+    pass
 
 class NoInstantNodes(Error):
-    pass
-
-class NotImplemented(Error):
     pass
 
 class NotSubscribed(Error):
@@ -33,6 +30,12 @@ class InvalidConfigurationOption(Error):
 
 class InvalidConfigurationValue(Error):
     msg = 'Bad configuration value'
+
+class NodeNotPersistent(Error):
+    pass
+
+class NoRootNode(Error):
+    pass
 
 class IBackendService(Interface):
     """ Interface to a backend service of a pubsub service. """

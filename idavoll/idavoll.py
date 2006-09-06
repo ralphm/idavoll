@@ -1,12 +1,11 @@
 # Copyright (c) 2003-2006 Ralph Meijer
 # See LICENSE for details.
 
-from twisted.words.protocols.jabber import component
+from twisted.words.protocols.jabber import component, error
 from twisted.application import service
 from twisted.internet import defer
 import backend
 import pubsub
-import xmpp_error
 import disco
 
 import sys
@@ -69,7 +68,7 @@ class IdavollService(component.Service):
             info.extend(i[1])
 
         if node and not info:
-            return xmpp_error.error_from_iq(iq, 'item-not-found')
+            return error.StanzaError('item-not-found').toResponse(iq)
         else:
             iq.swapAttributeValues("to", "from")
             iq["type"] = "result"
@@ -85,7 +84,7 @@ class IdavollService(component.Service):
     def _error(self, result, iq):
         print "Got error on index %d:" % result.value[1]
         result.value[0].printBriefTraceback()
-        return xmpp_error.error_from_iq(iq, 'internal-server-error')
+        return error.StanzaError('internal-server-error').toResponse(iq)
 
     def onDiscoItems(self, iq):
         dl = []
@@ -118,7 +117,7 @@ class IdavollService(component.Service):
         if iq.handled == True:
             return
 
-        self.send(xmpp_error.error_from_iq(iq, 'service-unavailable'))
+        self.send(error.StanzaError('service-unavailable').toResponse(iq))
 
 class LogService(component.Service):
 

@@ -1,7 +1,7 @@
 # Copyright (c) 2003-2006 Ralph Meijer
 # See LICENSE for details.
 
-from twisted.words.protocols.jabber import component,jid
+from twisted.words.protocols.jabber import component, jid, error
 from twisted.words.xish import utility, domish
 from twisted.python import components
 from twisted.internet import defer
@@ -9,7 +9,6 @@ from zope.interface import implements
 
 import backend
 import storage
-import xmpp_error
 import disco
 import data_form
 
@@ -40,6 +39,7 @@ PUBSUB_SUBSCRIBE = PUBSUB_SET + '/subscribe'
 PUBSUB_UNSUBSCRIBE = PUBSUB_SET + '/unsubscribe'
 PUBSUB_OPTIONS_GET = PUBSUB_GET + '/options'
 PUBSUB_OPTIONS_SET = PUBSUB_SET + '/options'
+PUBSUB_DEFAULT = PUBSUB_OWNER_GET + '/default'
 PUBSUB_CONFIGURE_GET = PUBSUB_OWNER_GET + '/configure'
 PUBSUB_CONFIGURE_SET = PUBSUB_OWNER_SET + '/configure'
 PUBSUB_SUBSCRIPTIONS = PUBSUB_GET + '/subscriptions'
@@ -49,37 +49,39 @@ PUBSUB_RETRACT = PUBSUB_SET + '/retract'
 PUBSUB_PURGE = PUBSUB_OWNER_SET + '/purge'
 PUBSUB_DELETE = PUBSUB_OWNER_SET + '/delete'
 
-class Error(Exception):
-    pubsub_error = None
-    stanza_error = None
-    msg = ''
+class BadRequest(error.StanzaError):
+    def __init__(self):
+        error.StanzaError.__init__(self, 'bad-request')
 
-class NotImplemented(Error):
-    stanza_error = 'feature-not-implemented'
+class PubSubError(error.StanzaError):
+    def __init__(self, condition, pubsubCondition, feature=None, text=None):
+        appCondition = domish.Element((NS_PUBSUB_ERRORS, pubsubCondition))
+        if feature:
+            appCondition['feature'] = feature
+        error.StanzaError.__init__(self, condition,
+                                         text=text, 
+                                         appCondition=appCondition)
 
-class BadRequest(Error):
-    stanza_error = 'bad-request'
-
-class OptionsUnavailable(Error):
-    stanza_error = 'feature-not-implemented'
-    pubsub_error = 'subscription-options-unavailable'
-
-class NodeNotConfigurable(Error):
-    stanza_error = 'feature-not-implemented'
-    pubsub_error = 'node-not-configurable'
+class OptionsUnavailable(PubSubError):
+    def __init__(self):
+        PubSubError.__init__(self, 'feature-not-implemented',
+                                   'unsupported',
+                                   'subscription-options-unavailable')
 
 error_map = {
-    storage.NodeNotFound: ('item-not-found', None),
-    storage.NodeExists: ('conflict', None),
-    storage.SubscriptionNotFound: ('not-authorized',
-                                   'not-subscribed'),
-    backend.NotAuthorized: ('not-authorized', None),
-    backend.NoPayloadAllowed: ('bad-request', None),
-    backend.PayloadExpected: ('bad-request', None),
-    backend.NoInstantNodes: ('not-acceptable', None),
-    backend.NotImplemented: ('feature-not-implemented', None),
-    backend.InvalidConfigurationOption: ('not-acceptable', None),
-    backend.InvalidConfigurationValue: ('not-acceptable', None),
+    storage.NodeNotFound: ('item-not-found', None, None),
+    storage.NodeExists: ('conflict', None, None),
+    storage.SubscriptionNotFound: ('not-authorized', 'not-subscribed', None),
+    backend.Forbidden: ('forbidden', None, None),
+    backend.ItemForbidden: ('bad-request', 'item-forbidden', None),
+    backend.ItemRequired: ('bad-request', 'item-required', None),
+    backend.NoInstantNodes: ('not-acceptable', 'unsupported', 'instant-nodes'),
+    backend.NotSubscribed: ('not-authorized', 'not-subscribed', None),
+    backend.InvalidConfigurationOption: ('not-acceptable', None, None),
+    backend.InvalidConfigurationValue: ('not-acceptable', None, None),
+    backend.NodeNotPersistent: ('feature-not-implemented', 'unsupported',
+                                                           'persistent-node'),
+    backend.NoRootNode: ('bad-request', None, None),
 }
 
 class Service(component.Service):
@@ -91,24 +93,23 @@ class Service(component.Service):
 
     def error(self, failure, iq):
         try: 
-            e = failure.trap(Error, *error_map.keys())
+            e = failure.trap(error.StanzaError, *error_map.keys())
         except:
             failure.printBriefTraceback()
-            xmpp_error.error_from_iq(iq, 'internal-server-error')
-            return iq
+            return error.StanzaError('internal-server-error').toResponse(iq)
         else:
-            if e == Error:
-                stanza_error = failure.value.stanza_error
-                pubsub_error = failure.value.pubsub_error
-                msg = ''
+            if e == error.StanzaError:
+                exc = failure.value
             else:
-                stanza_error, pubsub_error = error_map[e]
+                condition, pubsubCondition, feature = error_map[e]
                 msg = failure.value.msg
 
-            xmpp_error.error_from_iq(iq, stanza_error, msg)
-            if pubsub_error:
-                iq.error.addElement((NS_PUBSUB_ERRORS, pubsub_error))
-            return iq
+                if pubsubCondition:
+                    exc = PubSubError(condition, pubsubCondition, feature, msg)
+                else:
+                    exc = error.StanzaError(condition, text=msg)
+
+            return exc.toResponse(iq)
     
     def success(self, result, iq):
         iq.swapAttributeValues("to", "from")
@@ -362,6 +363,7 @@ class ComponentServiceFromNodeCreationService(Service):
 
     def componentConnected(self, xmlstream):
         xmlstream.addObserver(PUBSUB_CREATE, self.onCreate)
+        xmlstream.addObserver(PUBSUB_DEFAULT, self.onDefault)
         xmlstream.addObserver(PUBSUB_CONFIGURE_GET, self.onConfigureGet)
         xmlstream.addObserver(PUBSUB_CONFIGURE_SET, self.onConfigureSet)
 
@@ -371,6 +373,7 @@ class ComponentServiceFromNodeCreationService(Service):
         if not node:
             info.append(disco.Feature(NS_PUBSUB + "#create-nodes"))
             info.append(disco.Feature(NS_PUBSUB + "#config-node"))
+            info.append(disco.Feature(NS_PUBSUB + "#retrieve-default"))
 
             if self.backend.supports_instant_nodes():
                 info.append(disco.Feature(NS_PUBSUB + "#instant-nodes"))
@@ -378,6 +381,7 @@ class ComponentServiceFromNodeCreationService(Service):
         return defer.succeed(info)
 
     def onCreate(self, iq):
+        print "onCreate"
         self.handler_wrapper(self._onCreate, iq)
 
     def _onCreate(self, iq):
@@ -397,14 +401,26 @@ class ComponentServiceFromNodeCreationService(Service):
             entity['node'] = result
             return [reply]
 
+    def onDefault(self, iq):
+        self.handler_wrapper(self._onDefault, iq)
+
+    def _onDefault(self, iq):
+        d = self.backend.get_default_configuration()
+        d.addCallback(self._return_default_response)
+        return d
+        
+    def _return_default_response(self, options):
+        reply = domish.Element((NS_PUBSUB_OWNER, "pubsub"))
+        default = reply.addElement("default")
+        default.addChild(self._form_from_configuration(options))
+
+        return [reply]
+
     def onConfigureGet(self, iq):
         self.handler_wrapper(self._onConfigureGet, iq)
 
     def _onConfigureGet(self, iq):
-        try:
-            node_id = iq.pubsub.configure["node"]
-        except KeyError:
-            raise NodeNotConfigurable
+        node_id = iq.pubsub.configure.getAttribute("node")
 
         d = self.backend.get_node_configuration(node_id)
         d.addCallback(self._return_configuration_response, node_id)
@@ -415,26 +431,25 @@ class ComponentServiceFromNodeCreationService(Service):
         configure = reply.addElement("configure")
         if node_id:
             configure["node"] = node_id
+        configure.addChild(self._form_from_configuration(options))
+
+        return [reply]
+
+    def _form_from_configuration(self, options):
         form = data_form.Form(type="form",
                               form_type=NS_PUBSUB + "#node_config")
 
         for option in options:
             form.add_field(**option)
 
-        form.parent = configure
-        configure.addChild(form)
-
-        return [reply]
+        return form
 
     def onConfigureSet(self, iq):
+        print "onConfigureSet"
         self.handler_wrapper(self._onConfigureSet, iq)
 
     def _onConfigureSet(self, iq):
-        try:
-            node_id = iq.pubsub.configure["node"]
-        except KeyError:
-            raise BadRequest
-
+        node_id = iq.pubsub.configure["node"]
         requestor = jid.internJID(iq["from"]).userhostJID()
 
         for element in iq.pubsub.configure.elements():

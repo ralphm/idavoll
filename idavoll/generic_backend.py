@@ -78,7 +78,7 @@ class PublishService(service.Service):
     def _check_auth(self, node, requestor):
         def check(affiliation, node):
             if affiliation not in ['owner', 'publisher']:
-                raise backend.NotAuthorized
+                raise backend.Forbidden
             return node
 
         d = node.get_affiliation(requestor)
@@ -97,9 +97,9 @@ class PublishService(service.Service):
         deliver_payloads = configuration["pubsub#deliver_payloads"]
         
         if items and not persist_items and not deliver_payloads:
-            raise backend.NoPayloadAllowed
+            raise backend.ItemForbidden
         elif not items and (persist_items or deliver_payloads):
-            raise backend.PayloadExpected
+            raise backend.ItemRequired
 
         if persist_items or deliver_payloads:
             for item in items:
@@ -149,7 +149,7 @@ class SubscriptionService(service.Service):
     def subscribe(self, node_id, subscriber, requestor):
         subscriber_entity = subscriber.userhostJID()
         if subscriber_entity != requestor:
-            return defer.fail(backend.NotAuthorized())
+            return defer.fail(backend.Forbidden())
 
         d = self.parent.storage.get_node(node_id)
         d.addCallback(_get_affiliation, subscriber_entity)
@@ -160,7 +160,7 @@ class SubscriptionService(service.Service):
         node, affiliation = result
 
         if affiliation == 'outcast':
-            raise backend.NotAuthorized
+            raise backend.Forbidden
 
         d = node.add_subscription(subscriber, 'subscribed')
         d.addCallback(lambda _: 'subscribed')
@@ -177,7 +177,7 @@ class SubscriptionService(service.Service):
 
     def unsubscribe(self, node_id, subscriber, requestor):
         if subscriber.userhostJID() != requestor:
-            raise backend.NotAuthorized
+            return defer.fail(backend.Forbidden())
 
         d = self.parent.storage.get_node(node_id)
         d.addCallback(lambda node: node.remove_subscription(subscriber))
@@ -200,13 +200,17 @@ class NodeCreationService(service.Service):
         d.addCallback(lambda _: node_id)
         return d
 
+    def get_default_configuration(self):
+        d = defer.succeed(self.parent.default_config)
+        d.addCallback(self._make_config)
+        return d
+
     def get_node_configuration(self, node_id):
-        if node_id:
-            d = self.parent.storage.get_node(node_id)
-            d.addCallback(lambda node: node.get_configuration())
-        else:
-            # XXX: this is disabled in pubsub.py
-            d = defer.succeed(self.parent.default_config)
+        if not node_id:
+            raise backend.NoRootNode
+
+        d = self.parent.storage.get_node(node_id)
+        d.addCallback(lambda node: node.get_configuration())
 
         d.addCallback(self._make_config)
         return d
@@ -223,6 +227,9 @@ class NodeCreationService(service.Service):
         return options
 
     def set_node_configuration(self, node_id, options, requestor):
+        if not node_id:
+            raise backend.NoRootNode
+
         for key, value in options.iteritems():
             if not self.parent.options.has_key(key):
                 raise backend.InvalidConfigurationOption
@@ -241,7 +248,7 @@ class NodeCreationService(service.Service):
         node, affiliation = result
 
         if affiliation != 'owner':
-            raise backend.NotAuthorized
+            raise backend.Forbidden
 
         return node.set_configuration(options)
 
@@ -271,7 +278,7 @@ class ItemRetrievalService(service.Service):
         node, subscribed = result
 
         if not subscribed:
-            raise backend.NotAuthorized
+            raise backend.NotSubscribed
 
         if item_ids:
             return node.get_items_by_id(item_ids)
@@ -293,7 +300,7 @@ class RetractionService(service.Service):
         persist_items = node.get_configuration()["pubsub#persist_items"]
                                                                                 
         if affiliation not in ['owner', 'publisher']:
-            raise backend.NotAuthorized
+            raise backend.Forbidden
                                                                                 
         if not persist_items:
             raise backend.NodeNotPersistent
@@ -317,7 +324,7 @@ class RetractionService(service.Service):
         persist_items = node.get_configuration()["pubsub#persist_items"]
                                                                                 
         if affiliation != 'owner':
-            raise backend.NotAuthorized
+            raise backend.Forbidden
                                                                                 
         if not persist_items:
             raise backend.NodeNotPersistent
@@ -354,7 +361,7 @@ class NodeDeletionService(service.Service):
         node, affiliation = result
                                                                                 
         if affiliation != 'owner':
-            raise backend.NotAuthorized
+            raise backend.Forbidden
 
         d = defer.DeferredList([cb(node.id) for cb in self._callback_list],
                                consumeErrors=1)
