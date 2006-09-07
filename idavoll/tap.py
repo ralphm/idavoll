@@ -15,6 +15,7 @@ class Options(usage.Options):
         ('backend', None, 'memory'),
         ('dbuser', None, ''),
         ('dbname', None, 'pubsub'),
+        ('dbpass', None, ''),
     ]
 
     optFlags = [

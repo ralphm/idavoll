@@ -144,7 +144,8 @@ def makeService(config):
     if config['backend'] == 'pgsql':
         import pgsql_storage
         st = pgsql_storage.Storage(user=config['dbuser'],
-                                   database=config['dbname'])
+                                   database=config['dbname'],
+                                   password=config['dbpass'])
     elif config['backend'] == 'memory':
         import memory_storage
         st = memory_storage.Storage()

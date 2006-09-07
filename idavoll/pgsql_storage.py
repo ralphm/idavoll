@@ -12,9 +12,10 @@ class Storage:
 
     implements(storage.IStorage)
 
-    def __init__(self, user, database):
+    def __init__(self, user, database, password = None):
         self._dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
                                              user=user,
+                                             password=password,
                                              database=database,
                                              client_encoding='utf-8'
                                              )
