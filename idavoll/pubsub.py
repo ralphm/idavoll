@@ -1,16 +1,22 @@
 # Copyright (c) 2003-2006 Ralph Meijer
 # See LICENSE for details.
 
+from zope.interface import implements
+
 from twisted.words.protocols.jabber import component, jid, error
-from twisted.words.xish import utility, domish
+from twisted.words.xish import domish
 from twisted.python import components
 from twisted.internet import defer
-from zope.interface import implements
 
 import backend
 import storage
 import disco
 import data_form
+
+try:
+    from twisted.words.protocols.jabber.ijabber import IService
+except ImportError:
+    from twisted.words.protocols.jabber.component import IService
 
 if issubclass(domish.SerializedXML, str):
     # Work around bug # in twisted Xish
@@ -86,7 +92,7 @@ error_map = {
 
 class Service(component.Service):
 
-    implements(component.IService)
+    implements(IService)
 
     def __init__(self, backend):
         self.backend = backend
@@ -203,7 +209,7 @@ class ComponentServiceFromService(Service):
 
 components.registerAdapter(ComponentServiceFromService,
                            backend.IBackendService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromNotificationService(Service):
 
@@ -232,7 +238,7 @@ class ComponentServiceFromNotificationService(Service):
 
 components.registerAdapter(ComponentServiceFromNotificationService,
                            backend.INotificationService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromPublishService(Service):
 
@@ -266,7 +272,7 @@ class ComponentServiceFromPublishService(Service):
 
 components.registerAdapter(ComponentServiceFromPublishService,
                            backend.IPublishService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromSubscriptionService(Service):
 
@@ -357,7 +363,7 @@ class ComponentServiceFromSubscriptionService(Service):
 
 components.registerAdapter(ComponentServiceFromSubscriptionService,
                            backend.ISubscriptionService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromNodeCreationService(Service):
 
@@ -486,7 +492,7 @@ class ComponentServiceFromNodeCreationService(Service):
 
 components.registerAdapter(ComponentServiceFromNodeCreationService,
                            backend.INodeCreationService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromAffiliationsService(Service):
 
@@ -521,7 +527,7 @@ class ComponentServiceFromAffiliationsService(Service):
 
 components.registerAdapter(ComponentServiceFromAffiliationsService,
                            backend.IAffiliationsService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromItemRetrievalService(Service):
 
@@ -579,7 +585,7 @@ class ComponentServiceFromItemRetrievalService(Service):
 
 components.registerAdapter(ComponentServiceFromItemRetrievalService,
                            backend.IItemRetrievalService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromRetractionService(Service):
 
@@ -631,7 +637,7 @@ class ComponentServiceFromRetractionService(Service):
 
 components.registerAdapter(ComponentServiceFromRetractionService,
                            backend.IRetractionService,
-                           component.IService)
+                           IService)
 
 class ComponentServiceFromNodeDeletionService(Service):
 
@@ -685,4 +691,4 @@ class ComponentServiceFromNodeDeletionService(Service):
 
 components.registerAdapter(ComponentServiceFromNodeDeletionService,
                            backend.INodeDeletionService,
-                           component.IService)
+                           IService)

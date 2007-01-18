@@ -4,11 +4,14 @@
 from twisted.words.protocols.jabber import component, error
 from twisted.application import service
 from twisted.internet import defer
-import backend
-import pubsub
-import disco
 
-import sys
+import disco
+import pubsub
+
+try:
+    from twisted.words.protocols.jabber.ijabber import IService
+except ImportError:
+    from twisted.words.protocols.jabber.component import IService
 
 __version__ = '0.5.0'
 
@@ -52,7 +55,7 @@ class IdavollService(component.Service):
         node = iq.query.getAttribute("node")
 
         for c in self.parent:
-            if component.IService.providedBy(c):
+            if IService.providedBy(c):
                 if hasattr(c, "get_disco_info"):
                     dl.append(c.get_disco_info(node))
         d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
@@ -91,7 +94,7 @@ class IdavollService(component.Service):
         node = iq.query.getAttribute("node")
 
         for c in self.parent:
-            if component.IService.providedBy(c):
+            if IService.providedBy(c):
                 if hasattr(c, "get_disco_items"):
                     dl.append(c.get_disco_items(node))
         d = defer.DeferredList(dl, fireOnOneErrback=1, consumeErrors=1)
@@ -153,41 +156,41 @@ def makeService(config):
     import generic_backend as b
     bs = b.BackendService(st)
 
-    c = component.IService(bs)
+    c = IService(bs)
     c.setServiceParent(sm)
     c.hide_nodes = config["hide-nodes"]
 
     bsc = b.PublishService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.NotificationService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.SubscriptionService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.NodeCreationService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.AffiliationsService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.ItemRetrievalService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.RetractionService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     bsc = b.NodeDeletionService()
     bsc.setServiceParent(bs)
-    component.IService(bsc).setServiceParent(sm)
+    IService(bsc).setServiceParent(sm)
 
     s = IdavollService()
     s.setServiceParent(sm)
