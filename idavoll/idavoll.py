@@ -13,7 +13,7 @@ try:
 except ImportError:
     from twisted.words.protocols.jabber.component import IService
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 NS_VERSION = 'jabber:iq:version'
 

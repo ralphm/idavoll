@@ -6,7 +6,7 @@
 from distutils.core import setup
 
 setup(name='idavoll',
-      version='0.5.0',
+      version='0.6.0',
       description='Jabber Publish-Subscribe Service Component',
       author='Ralph Meijer',
       author_email='ralphm@ik.nu',
