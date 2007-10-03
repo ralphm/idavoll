@@ -14,7 +14,7 @@ Current Status
 There are two different backends: one using PostgreSQL for storage, and one
 just keeping everything in memory.
 
-In Idavoll the mimimal requirements of JEP-0060 version 1.8 are implemented
+In Idavoll the mimimal requirements of JEP-0060 version 1.9 are implemented
 plus most optional features, as returned by Service Discovery.
 
 Installing
@@ -26,7 +26,7 @@ INSTALL.
 Copyright
 =========
 
-All of the code in this distribution is Copyright (c) 2003-2006 Ralph Meijer.
+All of the code in this distribution is Copyright (c) 2003-2007 Ralph Meijer.
 
 Idavoll is made available under the MIT license. The included LICENSE file
 describes this in detail.

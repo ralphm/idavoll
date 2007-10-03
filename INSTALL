@@ -5,6 +5,7 @@ Requirements
 - Twisted Words >= 0.4.0
 - uuid.py (http://ofxsuite.berlios.de/uuid.py)
 - A jabber server that supports the component protocol (JEP-0114)
+- Wokkel (http://wokkel.ik.nu/)
 
 For the PostgreSQL backend, the following is also required:
 

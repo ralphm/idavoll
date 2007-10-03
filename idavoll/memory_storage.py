@@ -1,18 +1,19 @@
-# Copyright (c) 2003-2006 Ralph Meijer
+# Copyright (c) 2003-2007 Ralph Meijer
 # See LICENSE for details.
 
 import copy
 from zope.interface import implements
 from twisted.internet import defer
 from twisted.words.protocols.jabber import jid
-import storage
+
+from idavoll import error, iidavoll
 
 default_config = {"pubsub#persist_items": True,
                   "pubsub#deliver_payloads": True}
 
 class Storage:
 
-    implements(storage.IStorage)
+    implements(iidavoll.IStorage)
 
     def __init__(self):
         self._nodes = {}
@@ -21,7 +22,7 @@ class Storage:
         try:
             node = self._nodes[node_id]
         except KeyError:
-            return defer.fail(storage.NodeNotFound())
+            return defer.fail(error.NodeNotFound())
 
         return defer.succeed(node)
 
@@ -30,7 +31,7 @@ class Storage:
 
     def create_node(self, node_id, owner, config = None, type='leaf'):
         if node_id in self._nodes:
-            return defer.fail(storage.NodeExists())
+            return defer.fail(error.NodeExists())
 
         if not config:
             config = copy.copy(default_config)
@@ -47,7 +48,7 @@ class Storage:
         try:
             del self._nodes[node_id]
         except KeyError:
-            return defer.fail(storage.NodeNotFound())
+            return defer.fail(error.NodeNotFound())
 
         return defer.succeed(None)
 
@@ -70,7 +71,7 @@ class Storage:
         
 class Node:
 
-    implements(storage.INode)
+    implements(iidavoll.INode)
 
     def __init__(self, node_id, owner, config):
         self.id = node_id
@@ -110,8 +111,8 @@ class Node:
 
     def add_subscription(self, subscriber, state):
         if self._subscriptions.get(subscriber.full()):
-            return defer.fail(storage.SubscriptionExists())
-        
+            return defer.fail(error.SubscriptionExists())
+
         subscription = Subscription(state)
         self._subscriptions[subscriber.full()] = subscription
         return defer.succeed(None)
@@ -120,7 +121,7 @@ class Node:
         try:
             del self._subscriptions[subscriber.full()]
         except KeyError:
-            return defer.fail(storage.SubscriptionNotFound())
+            return defer.fail(error.SubscriptionNotFound())
 
         return defer.succeed(None)
 
@@ -208,15 +209,13 @@ class LeafNodeMixin:
 
 class LeafNode(Node, LeafNodeMixin):
 
-    implements(storage.ILeafNode)
+    implements(iidavoll.ILeafNode)
 
     def __init__(self, node_id, owner, config):
         Node.__init__(self, node_id, owner, config)
         LeafNodeMixin.__init__(self)
 
 class Subscription:
-
-    implements(storage.ISubscription)
 
     def __init__(self, state):
         self.state = state

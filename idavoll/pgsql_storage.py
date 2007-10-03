@@ -1,16 +1,16 @@
-# Copyright (c) 2003-2006 Ralph Meijer
+# Copyright (c) 2003-2007 Ralph Meijer
 # See LICENSE for details.
 
 import copy
-import storage
 from twisted.enterprise import adbapi
-from twisted.internet import defer
 from twisted.words.protocols.jabber import jid
 from zope.interface import implements
 
+from idavoll import error, iidavoll
+
 class Storage:
 
-    implements(storage.IStorage)
+    implements(iidavoll.IStorage)
 
     def __init__(self, user, database, password = None):
         self._dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
@@ -32,7 +32,7 @@ class Storage:
             (configuration["pubsub#persist_items"],
              configuration["pubsub#deliver_payloads"]) = cursor.fetchone()
         except TypeError:
-            raise storage.NodeNotFound
+            raise error.NodeNotFound()
         else:
             node = LeafNode(node_id, configuration)
             node._dbpool = self._dbpool
@@ -53,8 +53,8 @@ class Storage:
             cursor.execute("""INSERT INTO nodes (node) VALUES (%s)""",
                            (node_id))
         except cursor._pool.dbapi.OperationalError:
-            raise storage.NodeExists
-       
+            raise error.NodeExists()
+
         cursor.execute("""SELECT 1 from entities where jid=%s""",
                        (owner))
 
@@ -78,7 +78,7 @@ class Storage:
                        (node_id,))
 
         if cursor.rowcount != 1:
-            raise storage.NodeNotFound
+            raise error.NodeNotFound()
 
     def get_affiliations(self, entity):
         d = self._dbpool.runQuery("""SELECT node, affiliation FROM entities
@@ -110,7 +110,7 @@ class Storage:
 
 class Node:
 
-    implements(storage.INode)
+    implements(iidavoll.INode)
 
     def __init__(self, node_id, config):
         self.id = node_id
@@ -120,7 +120,7 @@ class Node:
         cursor.execute("""SELECT id FROM nodes WHERE node=%s""",
                        (self.id))
         if not cursor.fetchone():
-            raise backend.NodeNotFound
+            raise error.NodeNotFound()
 
     def get_type(self):
         return self.type
@@ -222,7 +222,7 @@ class Node:
                             self.id,
                             userhost))
         except cursor._pool.dbapi.OperationalError:
-            raise storage.SubscriptionExists
+            raise error.SubscriptionExists()
 
     def remove_subscription(self, subscriber):
         return self._dbpool.runInteraction(self._remove_subscription,
@@ -242,7 +242,7 @@ class Node:
                         userhost,
                         resource))
         if cursor.rowcount != 1:
-            raise storage.SubscriptionNotFound
+            raise error.SubscriptionNotFound()
 
         return None
 
@@ -398,4 +398,4 @@ class LeafNodeMixin:
 
 class LeafNode(Node, LeafNodeMixin):
 
-    implements(storage.ILeafNode)
+    implements(iidavoll.ILeafNode)

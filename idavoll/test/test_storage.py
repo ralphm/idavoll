@@ -1,12 +1,18 @@
-# Copyright (c) 2003-2006 Ralph Meijer
+# Copyright (c) 2003-2007 Ralph Meijer
 # See LICENSE for details.
+
+"""
+Tests for L{idavoll.memory_storage} and L{idavoll.pgsql_storage}.
+"""
 
 from twisted.trial import unittest
 from twisted.words.protocols.jabber import jid
 from twisted.internet import defer
 from twisted.words.xish import domish
 
-from idavoll import storage, pubsub
+from wokkel import pubsub
+
+from idavoll import error
 
 OWNER = jid.JID('owner@example.com')
 SUBSCRIBER = jid.JID('subscriber@example.com/Home')
@@ -38,7 +44,7 @@ class StorageTests:
     def _assignTestNode(self, node):
         self.node = node
 
-    def setUpClass(self):
+    def setUp(self):
         d = self.s.get_node('pre-existing')
         d.addCallback(self._assignTestNode)
         return d
@@ -48,7 +54,7 @@ class StorageTests:
 
     def testGetNonExistingNode(self):
         d = self.s.get_node('non-existing')
-        self.assertFailure(d, storage.NodeNotFound)
+        self.assertFailure(d, error.NodeNotFound)
         return d
 
     def testGetNodeIDs(self):
@@ -60,7 +66,7 @@ class StorageTests:
 
     def testCreateExistingNode(self):
         d = self.s.create_node('pre-existing', OWNER)
-        self.assertFailure(d, storage.NodeExists)
+        self.assertFailure(d, error.NodeExists)
         return d
 
     def testCreateNode(self):
@@ -74,13 +80,13 @@ class StorageTests:
 
     def testDeleteNonExistingNode(self):
         d = self.s.delete_node('non-existing')
-        self.assertFailure(d, storage.NodeNotFound)
+        self.assertFailure(d, error.NodeNotFound)
         return d
 
     def testDeleteNode(self):
         def cb(void):
             d = self.s.get_node('to-be-deleted')
-            self.assertFailure(d, storage.NodeNotFound)
+            self.assertFailure(d, error.NodeNotFound)
             return d
 
         d = self.s.delete_node('to-be-deleted')
@@ -98,7 +104,7 @@ class StorageTests:
     def testGetSubscriptions(self):
         def cb(subscriptions):
             self.assertIn(('pre-existing', SUBSCRIBER, 'subscribed'), subscriptions)
-        
+
         d = self.s.get_subscriptions(SUBSCRIBER)
         d.addCallback(cb)
         return d
@@ -124,7 +130,7 @@ class StorageTests:
         def check_object_config(node):
             config = node.get_configuration()
             self.assertEqual(config['pubsub#persist_items'], False)
-        
+
         def get_node(void):
             return self.s.get_node('to-be-reconfigured')
 
@@ -177,9 +183,9 @@ class StorageTests:
 
     def testAddExistingSubscription(self):
         d = self.node.add_subscription(SUBSCRIBER, 'pending')
-        self.assertFailure(d, storage.SubscriptionExists)
+        self.assertFailure(d, error.SubscriptionExists)
         return d
-    
+
     def testGetSubscription(self):
         def cb(subscriptions):
             self.assertEquals(subscriptions[0][1], 'subscribed')
@@ -197,9 +203,9 @@ class StorageTests:
 
     def testRemoveNonExistingSubscription(self):
         d = self.node.remove_subscription(OWNER)
-        self.assertFailure(d, storage.SubscriptionNotFound)
+        self.assertFailure(d, error.SubscriptionNotFound)
         return d
-    
+
     def testGetSubscribers(self):
         def cb(subscribers):
             self.assertIn(SUBSCRIBER, subscribers)
@@ -309,7 +315,7 @@ class StorageTests:
 
         def cb2(node):
             return node.get_items()
-        
+
         def cb3(result):
             self.assertEqual([], result)
 
@@ -326,7 +332,7 @@ class StorageTests:
         def cb2(affiliations):
             affiliations = dict(((a[0].full(), a[1]) for a in affiliations))
             self.assertEquals(affiliations[OWNER.full()], 'owner')
-        
+
         d = self.s.get_node('pre-existing')
         d.addCallback(cb1)
         d.addCallback(cb2)
@@ -334,7 +340,7 @@ class StorageTests:
 
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
-    def setUpClass(self):
+    def setUp(self):
         from idavoll.memory_storage import Storage, LeafNode, Subscription, \
                                            default_config
         self.s = Storage()
@@ -363,18 +369,18 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         self.s._nodes['pre-existing']._items['current'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
 
-        return StorageTests.setUpClass(self)
+        return StorageTests.setUp(self)
 
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
-    def _callSuperSetUpClass(self, void):
-        return StorageTests.setUpClass(self)
+    def _callSuperSetUp(self, void):
+        return StorageTests.setUp(self)
 
-    def setUpClass(self):
+    def setUp(self):
         from idavoll.pgsql_storage import Storage
         self.s = Storage('ralphm', 'pubsub_test')
         self.s._dbpool.start()
         d = self.s._dbpool.runInteraction(self.init)
-        d.addCallback(self._callSuperSetUpClass)
+        d.addCallback(self._callSuperSetUp)
         return d
 
     def tearDownClass(self):
@@ -444,7 +450,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                           WHERE node='pre-existing'""",
                        (PUBLISHER.userhost(),
                         ITEM.toXml()))
-    
+
     def cleandb(self, cursor):
         cursor.execute("""DELETE FROM nodes WHERE node in
                           ('non-existing', 'pre-existing', 'to-be-deleted',
@@ -460,3 +466,9 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                        SUBSCRIBER_PENDING.userhost())
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
                        PUBLISHER.userhost())
+
+try:
+    import pyPgSQL
+    pyPgSQL
+except ImportError:
+    PgsqlStorageStorageTestCase.skip = "pyPgSQL not available"
