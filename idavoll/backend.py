@@ -108,7 +108,7 @@ class BackendService(service.Service, utility.EventDispatcher):
         if persist_items or deliver_payloads:
             for item in items:
                 if not item.getAttribute("id"):
-                    item["id"] = uuid.generate()
+                    item["id"] = str(uuid.uuid4())
 
         if persist_items:
             d = node.store_items(items, requestor)
@@ -186,7 +186,7 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def create_node(self, node_id, requestor):
         if not node_id:
-            node_id = 'generic/%s' % uuid.generate()
+            node_id = 'generic/%s' % uuid.uuid4()
         d = self.storage.create_node(node_id, requestor)
         d.addCallback(lambda _: node_id)
         return d
