@@ -47,9 +47,9 @@ def makeService(config):
     if config["verbose"]:
         cs.logTraffic = True
 
-    FallbackHandler().setHanderParent(cs)
-    VersionHandler('Idavoll', __version__).setHanderParent(cs)
-    DiscoHandler().setHanderParent(cs)
+    FallbackHandler().setHandlerParent(cs)
+    VersionHandler('Idavoll', __version__).setHandlerParent(cs)
+    DiscoHandler().setHandlerParent(cs)
 
     if config['backend'] == 'pgsql':
         from idavoll.pgsql_storage import Storage
@@ -64,7 +64,7 @@ def makeService(config):
     bs.setServiceParent(s)
 
     ps = IPubSubService(bs)
-    ps.setHanderParent(cs)
+    ps.setHandlerParent(cs)
     ps.hideNodes = config["hide-nodes"]
     ps.serviceJID = JID(config["jid"])
 

@@ -461,6 +461,8 @@ class PubSubServiceFromBackend(PubSubService):
         return d
 
     def getNodes(self, requestor, service):
+        if service.resource:
+            return defer.succeed([])
         d = self.backend.get_nodes()
         return d.addErrback(self._mapErrors)
 
