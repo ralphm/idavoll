@@ -12,11 +12,14 @@ class Storage:
 
     implements(iidavoll.IStorage)
 
-    def __init__(self, user, database, password = None):
+    def __init__(self, user, database, password=None, host=None, port=None):
         self._dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
                                              user=user,
                                              password=password,
                                              database=database,
+                                             host=host,
+                                             port=port,
+                                             cp_reconnect=True,
                                              client_encoding='utf-8'
                                              )
 

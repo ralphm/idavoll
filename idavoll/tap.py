@@ -16,14 +16,16 @@ __version__ = '0.6.0'
 
 class Options(usage.Options):
     optParameters = [
-        ('jid', None, 'pubsub'),
-        ('secret', None, 'secret'),
-        ('rhost', None, '127.0.0.1'),
-        ('rport', None, '5347'),
-        ('backend', None, 'memory'),
-        ('dbuser', None, ''),
-        ('dbname', None, 'pubsub'),
-        ('dbpass', None, ''),
+        ('jid', None, 'pubsub', 'JID this component will be available at'),
+        ('secret', None, 'secret', 'Jabber server component secret'),
+        ('rhost', None, '127.0.0.1', 'Jabber server host'),
+        ('rport', None, '5347', 'Jabber server port'),
+        ('backend', None, 'memory', 'Choice of storage backend'),
+        ('dbuser', None, '', 'Database user (pgsql backend)'),
+        ('dbname', None, 'pubsub', 'Database name (pgsql backend)'),
+        ('dbpass', None, '', 'Database password (pgsql backend)'),
+        ('dbhost', None, '', 'Database host (pgsql backend)'),
+        ('dbport', None, '', 'Database port (pgsql backend)'),
     ]
 
     optFlags = [
@@ -55,7 +57,9 @@ def makeService(config):
         from idavoll.pgsql_storage import Storage
         st = Storage(user=config['dbuser'],
                      database=config['dbname'],
-                     password=config['dbpass'])
+                     password=config['dbpass'],
+                     host=config['dbhost'],
+                     port=config['dbport'])
     elif config['backend'] == 'memory':
         from idavoll.memory_storage import Storage
         st = Storage()
