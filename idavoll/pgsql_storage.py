@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 import copy
@@ -110,6 +110,7 @@ class Storage:
                  jid.internJID('%s/%s' % (subscriber, resource)),
                  subscription)
                 for node, subscriber, resource, subscription in subscriptions]
+
 
 class Node:
 
@@ -245,7 +246,7 @@ class Node:
                         userhost,
                         resource))
         if cursor.rowcount != 1:
-            raise error.SubscriptionNotFound()
+            raise error.NotSubscribed()
 
         return None
 

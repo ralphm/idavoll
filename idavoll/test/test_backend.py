@@ -1,19 +1,18 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 """
 Tests for L{idavoll.backend}.
 """
 
-from zope.interface import implements
-
 from twisted.internet import defer
 from twisted.trial import unittest
 from twisted.words.protocols.jabber import jid
+from twisted.words.protocols.jabber.error import StanzaError
 
 from wokkel import pubsub
 
-from idavoll import backend, error, iidavoll
+from idavoll import backend, error
 
 OWNER = jid.JID('owner@example.com')
 
@@ -105,4 +104,40 @@ class BackendTest(unittest.TestCase):
 
         items = [pubsub.Item()]
         d = self.backend.publish('node', items, OWNER)
+        return d
+
+
+class PubSubServiceFromBackendTest(unittest.TestCase):
+
+    def test_unsubscribeNotSubscribed(self):
+        """
+        Test unsubscription request when not subscribed.
+        """
+
+        class TestBackend(object):
+            def supports_publisher_affiliation(self):
+                return True
+
+            def supports_outcast_affiliation(self):
+                return True
+
+            def supports_persistent_items(self):
+                return True
+
+            def supports_instant_nodes(self):
+                return True
+
+            def register_notifier(self, observerfn, *args, **kwargs):
+                return
+
+            def unsubscribe(self, nodeIdentifier, subscriber, requestor):
+                return defer.fail(error.NotSubscribed())
+
+        def cb(e):
+            self.assertEquals('unexpected-request', e.condition)
+
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        d = s.unsubscribe(OWNER, 'test.example.org', 'test', OWNER)
+        self.assertFailure(d, StanzaError)
+        d.addCallback(cb)
         return d

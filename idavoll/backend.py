@@ -1,6 +1,6 @@
 # -*- test-case-name: idavoll.test.test_backend -*-
 #
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 import uuid
@@ -23,6 +23,7 @@ def _get_affiliation(node, entity):
     d = node.get_affiliation(entity)
     d.addCallback(lambda affiliation: (node, affiliation))
     return d
+
 
 class BackendService(service.Service, utility.EventDispatcher):
 
@@ -360,16 +361,13 @@ class PubSubServiceFromBackend(PubSubService):
     _errorMap = {
         error.NodeNotFound: ('item-not-found', None, None),
         error.NodeExists: ('conflict', None, None),
-        error.SubscriptionNotFound: ('not-authorized',
-                                     'not-subscribed',
-                                     None),
         error.Forbidden: ('forbidden', None, None),
         error.ItemForbidden: ('bad-request', 'item-forbidden', None),
         error.ItemRequired: ('bad-request', 'item-required', None),
         error.NoInstantNodes: ('not-acceptable',
                                'unsupported',
                                'instant-nodes'),
-        error.NotSubscribed: ('not-authorized', 'not-subscribed', None),
+        error.NotSubscribed: ('unexpected-request', 'not-subscribed', None),
         error.InvalidConfigurationOption: ('not-acceptable', None, None),
         error.InvalidConfigurationValue: ('not-acceptable', None, None),
         error.NodeNotPersistent: ('feature-not-implemented',

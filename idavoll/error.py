@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 class Error(Exception):
@@ -13,8 +13,10 @@ class NodeNotFound(Error):
 class NodeExists(Error):
     pass
 
-class SubscriptionNotFound(Error):
-    pass
+class NotSubscribed(Error):
+    """
+    Entity is not subscribed to this node.
+    """
 
 class SubscriptionExists(Error):
     pass
@@ -29,9 +31,6 @@ class ItemRequired(Error):
     pass
 
 class NoInstantNodes(Error):
-    pass
-
-class NotSubscribed(Error):
     pass
 
 class InvalidConfigurationOption(Error):

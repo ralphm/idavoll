@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 import copy
@@ -68,7 +68,8 @@ class Storage:
                                           subscription.state))
 
         return defer.succeed(subscriptions)
-        
+
+
 class Node:
 
     implements(iidavoll.INode)
@@ -84,7 +85,7 @@ class Node:
 
     def get_configuration(self):
         return self._config
-    
+
     def get_meta_data(self):
         config = copy.copy(self._config)
         config["pubsub#node_type"] = self.type
@@ -96,7 +97,7 @@ class Node:
                 self._config[option] = options[option]
 
         return defer.succeed(None)
-                
+
     def get_affiliation(self, entity):
         return defer.succeed(self._affiliations.get(entity.full()))
 
@@ -121,7 +122,7 @@ class Node:
         try:
             del self._subscriptions[subscriber.full()]
         except KeyError:
-            return defer.fail(error.SubscriptionNotFound())
+            return defer.fail(error.NotSubscribed())
 
         return defer.succeed(None)
 
@@ -137,7 +138,7 @@ class Node:
             if jid.internJID(subscriber).userhost() == entity.userhost() and \
                     subscription.state == 'subscribed':
                 return defer.succeed(True)
-        
+
         return defer.succeed(False)
 
     def get_affiliations(self):
@@ -145,6 +146,7 @@ class Node:
                        in self._affiliations.iteritems()]
 
         return defer.succeed(affiliations)
+
 
 class LeafNodeMixin:
 
@@ -180,7 +182,7 @@ class LeafNodeMixin:
                 self._itemlist.remove(item)
                 del self._items[item_id]
                 deleted.append(item_id)
-        
+
         return defer.succeed(deleted)
 
     def get_items(self, max_items=None):
@@ -189,7 +191,7 @@ class LeafNodeMixin:
         else:
             list = self._itemlist
         return defer.succeed([item[0] for item in list])
-    
+
     def get_items_by_id(self, item_ids):
         items = []
         for item_id in item_ids:
@@ -207,6 +209,7 @@ class LeafNodeMixin:
 
         return defer.succeed(None)
 
+
 class LeafNode(Node, LeafNodeMixin):
 
     implements(iidavoll.ILeafNode)
@@ -214,6 +217,7 @@ class LeafNode(Node, LeafNodeMixin):
     def __init__(self, node_id, owner, config):
         Node.__init__(self, node_id, owner, config)
         LeafNodeMixin.__init__(self)
+
 
 class Subscription:
 

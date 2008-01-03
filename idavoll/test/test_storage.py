@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 """
@@ -38,6 +38,7 @@ def decode(object):
     if isinstance(object, str):
         object = object.decode('utf-8')
     return object
+
 
 class StorageTests:
 
@@ -203,7 +204,7 @@ class StorageTests:
 
     def testRemoveNonExistingSubscription(self):
         d = self.node.remove_subscription(OWNER)
-        self.assertFailure(d, error.SubscriptionNotFound)
+        self.assertFailure(d, error.NotSubscribed)
         return d
 
     def testGetSubscribers(self):
@@ -338,6 +339,7 @@ class StorageTests:
         d.addCallback(cb2)
         return d
 
+
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUp(self):
@@ -370,6 +372,7 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         self.s._nodes['pre-existing']._itemlist.append(item)
 
         return StorageTests.setUp(self)
+
 
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
     def _callSuperSetUp(self, void):
