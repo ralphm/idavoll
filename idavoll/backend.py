@@ -455,7 +455,7 @@ class PubSubServiceFromBackend(PubSubService):
         d.addCallback(saveType)
         d.addCallback(self.backend.get_node_meta_data)
         d.addCallback(saveMetaData)
-        d.errback(self._mapErrors)
+        d.addErrback(self._mapErrors)
         return d
 
     def getNodes(self, requestor, service):

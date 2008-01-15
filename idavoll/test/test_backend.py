@@ -107,6 +107,26 @@ class BackendTest(unittest.TestCase):
         return d
 
 
+class BaseTestBackend(object):
+    """
+    Base class for backend stubs.
+    """
+
+    def supports_publisher_affiliation(self):
+        return True
+
+    def supports_outcast_affiliation(self):
+        return True
+
+    def supports_persistent_items(self):
+        return True
+
+    def supports_instant_nodes(self):
+        return True
+
+    def register_notifier(self, observerfn, *args, **kwargs):
+        return
+
 class PubSubServiceFromBackendTest(unittest.TestCase):
 
     def test_unsubscribeNotSubscribed(self):
@@ -114,22 +134,7 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
         Test unsubscription request when not subscribed.
         """
 
-        class TestBackend(object):
-            def supports_publisher_affiliation(self):
-                return True
-
-            def supports_outcast_affiliation(self):
-                return True
-
-            def supports_persistent_items(self):
-                return True
-
-            def supports_instant_nodes(self):
-                return True
-
-            def register_notifier(self, observerfn, *args, **kwargs):
-                return
-
+        class TestBackend(BaseTestBackend):
             def unsubscribe(self, nodeIdentifier, subscriber, requestor):
                 return defer.fail(error.NotSubscribed())
 
@@ -139,5 +144,28 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
         s = backend.PubSubServiceFromBackend(TestBackend())
         d = s.unsubscribe(OWNER, 'test.example.org', 'test', OWNER)
         self.assertFailure(d, StanzaError)
+        d.addCallback(cb)
+        return d
+
+    def test_getNodeInfo(self):
+        """
+        Test retrieving node information.
+        """
+
+        class TestBackend(BaseTestBackend):
+            def get_node_type(self, nodeIdentifier):
+                return defer.succeed('leaf')
+
+            def get_node_meta_data(self, nodeIdentifier):
+                return defer.succeed({'pubsub#persist_items': True})
+
+        def cb(info):
+            self.assertIn('type', info)
+            self.assertEquals('leaf', info['type'])
+            self.assertIn('meta-data', info)
+            self.assertEquals({'pubsub#persist_items': True}, info['meta-data'])
+
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        d = s.getNodeInfo(OWNER, 'test.example.org', 'test')
         d.addCallback(cb)
         return d
