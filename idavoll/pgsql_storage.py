@@ -46,7 +46,7 @@ class Storage:
         d.addCallback(lambda results: [r[0] for r in results])
         return d
 
-    def create_node(self, node_id, owner, type='leaf'):
+    def create_node(self, node_id, owner, config=None):
         return self._dbpool.runInteraction(self._create_node, node_id, owner)
 
     def _create_node(self, cursor, node_id, owner):

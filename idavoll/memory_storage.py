@@ -9,7 +9,8 @@ from twisted.words.protocols.jabber import jid
 from idavoll import error, iidavoll
 
 default_config = {"pubsub#persist_items": True,
-                  "pubsub#deliver_payloads": True}
+                  "pubsub#deliver_payloads": True,
+                  "pubsub#node_type": "leaf"}
 
 class Storage:
 
@@ -29,14 +30,14 @@ class Storage:
     def get_node_ids(self):
         return defer.succeed(self._nodes.keys())
 
-    def create_node(self, node_id, owner, config = None, type='leaf'):
+    def create_node(self, node_id, owner, config=None):
         if node_id in self._nodes:
             return defer.fail(error.NodeExists())
 
         if not config:
             config = copy.copy(default_config)
 
-        if type != 'leaf':
+        if config['pubsub#node_type'] != 'leaf':
             raise NotImplementedError
 
         node = LeafNode(node_id, owner, config)

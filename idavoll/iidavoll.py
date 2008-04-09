@@ -139,6 +139,7 @@ class IBackendService(Interface):
         """ Publish items to a pubsub node.
 
         @return: a deferred that fires when the items have been published.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
         """
 
     def register_notifier(observerfn, *args, **kwargs):
@@ -184,7 +185,7 @@ class IStorage(Interface):
         @return: deferred that returns a list of NodeIDs (L{str}).
         """
 
-    def create_node(node_id, owner, config = None, type='leaf'):
+    def create_node(node_id, owner, config=None):
         """
         Create new node.
 
@@ -196,7 +197,6 @@ class IStorage(Interface):
         @param owner: JID of the new nodes's owner.
         @type owner: L{jid.JID}
         @param config: Configuration
-        @param type: Node type. Can be either C{'leaf'} or C{'collection'}.
         @return: deferred that fires on creation.
         """
 
