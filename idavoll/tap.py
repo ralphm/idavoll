@@ -40,18 +40,7 @@ class Options(usage.Options):
 def makeService(config):
     s = service.MultiService()
 
-    cs = Component(config["rhost"], int(config["rport"]),
-                   config["jid"], config["secret"])
-    cs.setServiceParent(s)
-
-    cs.factory.maxDelay = 900
-
-    if config["verbose"]:
-        cs.logTraffic = True
-
-    FallbackHandler().setHandlerParent(cs)
-    VersionHandler('Idavoll', __version__).setHandlerParent(cs)
-    DiscoHandler().setHandlerParent(cs)
+    # Create backend service with storage
 
     if config['backend'] == 'pgsql':
         from idavoll.pgsql_storage import Storage
@@ -66,6 +55,21 @@ def makeService(config):
 
     bs = BackendService(st)
     bs.setServiceParent(s)
+
+    # Set up XMPP server-side component with publish-subscribe capabilities
+
+    cs = Component(config["rhost"], int(config["rport"]),
+                   config["jid"], config["secret"])
+    cs.setServiceParent(s)
+
+    cs.factory.maxDelay = 900
+
+    if config["verbose"]:
+        cs.logTraffic = True
+
+    FallbackHandler().setHandlerParent(cs)
+    VersionHandler('Idavoll', __version__).setHandlerParent(cs)
+    DiscoHandler().setHandlerParent(cs)
 
     ps = IPubSubService(bs)
     ps.setHandlerParent(cs)
