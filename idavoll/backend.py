@@ -385,6 +385,7 @@ class PubSubServiceFromBackend(PubSubService):
         self.pubSubFeatures = self._getPubSubFeatures()
 
         self.backend.register_notifier(self._notify)
+        self.backend.register_pre_delete(self._pre_delete)
 
     def _getPubSubFeatures(self):
         features = [
@@ -425,6 +426,13 @@ class PubSubServiceFromBackend(PubSubService):
         d.addCallback(lambda notifications: self.notifyPublish(self.serviceJID,
                                                                nodeIdentifier,
                                                                notifications))
+
+    def _pre_delete(self, nodeIdentifier):
+        d = self.backend.get_subscribers(nodeIdentifier)
+        d.addCallback(lambda subscribers: self.notifyDelete(self.serviceJID,
+                                                            nodeIdentifier,
+                                                            subscribers))
+        return d
 
     def _mapErrors(self, failure):
         e = failure.trap(*self._errorMap.keys())
