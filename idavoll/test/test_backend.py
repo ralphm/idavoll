@@ -127,6 +127,9 @@ class BaseTestBackend(object):
     def register_notifier(self, observerfn, *args, **kwargs):
         return
 
+    def register_pre_delete(self, pre_delete_fn):
+        return
+
 class PubSubServiceFromBackendTest(unittest.TestCase):
 
     def test_unsubscribeNotSubscribed(self):
