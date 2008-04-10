@@ -28,12 +28,16 @@ class Storage:
 
     def _get_node(self, cursor, node_id):
         configuration = {}
-        cursor.execute("""SELECT persistent, deliver_payload FROM nodes
+        cursor.execute("""SELECT persistent, deliver_payload,
+                                 send_last_published_item
+                          FROM nodes
                           WHERE node=%s""",
                        (node_id,))
         try:
             (configuration["pubsub#persist_items"],
-             configuration["pubsub#deliver_payloads"]) = cursor.fetchone()
+             configuration["pubsub#deliver_payloads"],
+             configuration["pubsub#send_last_published_item") = \
+            cursor.fetchone()
         except TypeError:
             raise error.NodeNotFound()
         else:
@@ -138,17 +142,19 @@ class Node:
         for option in options:
             if option in config:
                 config[option] = options[option]
-        
+
         d = self._dbpool.runInteraction(self._set_configuration, config)
         d.addCallback(self._set_cached_configuration, config)
         return d
 
     def _set_configuration(self, cursor, config):
         self._check_node_exists(cursor)
-        cursor.execute("""UPDATE nodes SET persistent=%s, deliver_payload=%s
+        cursor.execute("""UPDATE nodes SET persistent=%s, deliver_payload=%s,
+                                           send_last_published_item=%s
                           WHERE node=%s""",
                        (config["pubsub#persist_items"],
                         config["pubsub#deliver_payloads"],
+                        config["pubsub#send_last_published_item"],
                         self.id))
 
     def _set_cached_configuration(self, void, config):
@@ -300,7 +306,7 @@ class Node:
                           WHERE node=%s""",
                        self.id)
         result = cursor.fetchall()
-        
+
         return [(jid.internJID(r[0]), r[1]) for r in result]
 
 class LeafNodeMixin:
@@ -340,7 +346,7 @@ class LeafNodeMixin:
 
     def _remove_items(self, cursor, item_ids):
         self._check_node_exists(cursor)
-        
+
         deleted = []
 
         for item_id in item_ids:

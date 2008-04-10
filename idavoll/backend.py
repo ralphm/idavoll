@@ -35,10 +35,15 @@ class BackendService(service.Service, utility.EventDispatcher):
                "pubsub#deliver_payloads":
                   {"type": "boolean",
                    "label": "Deliver payloads with event notifications"},
+               "pubsub#send_last_published_item":
+                  {"type": "list-single",
+                   "label": "When to send the last published item',
+                   "options": {'never', 'on_sub'},
               }
 
     default_config = {"pubsub#persist_items": True,
                       "pubsub#deliver_payloads": True,
+                      "pubsub#send_last_published_item": 'on_sub',
                      }
 
     def __init__(self, storage):
