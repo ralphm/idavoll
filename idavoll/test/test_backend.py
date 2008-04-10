@@ -15,6 +15,7 @@ from wokkel import pubsub
 from idavoll import backend, error
 
 OWNER = jid.JID('owner@example.com')
+NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 
 class BackendTest(unittest.TestCase):
     def test_delete_node(self):
@@ -106,6 +107,48 @@ class BackendTest(unittest.TestCase):
         d = self.backend.publish('node', items, OWNER)
         return d
 
+    def test_notifyOnSubscription(self):
+        """
+        Test notification of last published item on subscription.
+        """
+        ITEM = "<item xmlns='%s' id='1'/>" % NS_PUBSUB
+
+        class testNode:
+            id = 'node'
+            def get_affiliation(self, entity):
+                if entity is OWNER:
+                    return defer.succeed('owner')
+            def get_configuration(self):
+                return {'pubsub#deliver_payloads': True,
+                        'pubsub#persist_items': False,
+                        'pubsub#send_last_published_item': 'on_sub'}
+            def get_items(self, max_items):
+                return [ITEM]
+            def add_subscription(self, subscriber, state):
+                return defer.succeed(None)
+
+        class testStorage:
+            def get_node(self, node_id):
+                return defer.succeed(testNode())
+
+        def cb(data):
+            print [ITEM] == data['items']
+            self.assertEquals('node', data['node_id'])
+            self.assertEquals([ITEM], data['items'])
+            self.assertEquals(OWNER, data['subscriber'])
+
+        self.storage = testStorage()
+        self.backend = backend.BackendService(self.storage)
+        self.storage.backend = self.backend
+
+        d1 = defer.Deferred()
+        d1.addCallback(cb)
+        self.backend.register_notifier(d1.callback)
+        d2 = self.backend.subscribe('node', OWNER, OWNER)
+        return defer.gatherResults([d1, d2])
+
+    test_notifyOnSubscription.timeout = 2
+
 
 class BaseTestBackend(object):
     """
@@ -129,6 +172,7 @@ class BaseTestBackend(object):
 
     def register_pre_delete(self, pre_delete_fn):
         return
+
 
 class PubSubServiceFromBackendTest(unittest.TestCase):
 

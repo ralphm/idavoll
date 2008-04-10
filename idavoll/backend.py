@@ -159,6 +159,7 @@ class BackendService(service.Service, utility.EventDispatcher):
             raise error.Forbidden()
 
         d = node.add_subscription(subscriber, 'subscribed')
+        d.addCallback(lambda _: self._send_last_published(node, subscriber))
         d.addCallback(lambda _: 'subscribed')
         d.addErrback(self._get_subscription, node, subscriber)
         d.addCallback(self._return_subscription, node.id)
@@ -170,6 +171,23 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def _return_subscription(self, result, node_id):
         return node_id, result
+
+    def _send_last_published(self, node, subscriber):
+        def notify_item(items):
+            if not items:
+                return
+
+            self.dispatch({'items': items,
+                           'node_id': node.id,
+                           'subscriber': subscriber},
+                          '//event/pubsub/notify')
+
+        config = node.get_configuration()
+        if config["pubsub#send_last_published_item"] != 'on_sub':
+            return
+
+        d = self.get_items(node.id, subscriber.userhostJID(), 1)
+        d.addCallback(notify_item)
 
     def unsubscribe(self, node_id, subscriber, requestor):
         if subscriber.userhostJID() != requestor:
@@ -422,7 +440,10 @@ class PubSubServiceFromBackend(PubSubService):
     def _notify(self, data):
         items = data['items']
         nodeIdentifier = data['node_id']
-        d = self.backend.get_notification_list(nodeIdentifier, items)
+        if 'subscriber' not in data:
+            d = self.backend.get_notification_list(nodeIdentifier, items)
+        else:
+            d = defer.succeed([(data['subscriber'], items)])
         d.addCallback(lambda notifications: self.notifyPublish(self.serviceJID,
                                                                nodeIdentifier,
                                                                notifications))
