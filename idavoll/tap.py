@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2007 Ralph Meijer
+# Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
 from twisted.application import service
@@ -37,6 +37,8 @@ class Options(usage.Options):
         if self['backend'] not in ['pgsql', 'memory']:
             raise usage.UsageError, "Unknown backend!"
 
+        self['jid'] = JID(self['jid'])
+
 def makeService(config):
     s = service.MultiService()
 
@@ -54,12 +56,14 @@ def makeService(config):
         st = Storage()
 
     bs = BackendService(st)
+    bs.setName('backend')
     bs.setServiceParent(s)
 
     # Set up XMPP server-side component with publish-subscribe capabilities
 
     cs = Component(config["rhost"], int(config["rport"]),
-                   config["jid"], config["secret"])
+                   config["jid"].full(), config["secret"])
+    cs.setName('component')
     cs.setServiceParent(s)
 
     cs.factory.maxDelay = 900
@@ -74,6 +78,6 @@ def makeService(config):
     ps = IPubSubService(bs)
     ps.setHandlerParent(cs)
     ps.hideNodes = config["hide-nodes"]
-    ps.serviceJID = JID(config["jid"])
+    ps.serviceJID = config["jid"]
 
     return s
