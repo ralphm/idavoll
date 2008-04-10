@@ -37,8 +37,12 @@ class BackendService(service.Service, utility.EventDispatcher):
                    "label": "Deliver payloads with event notifications"},
                "pubsub#send_last_published_item":
                   {"type": "list-single",
-                   "label": "When to send the last published item',
-                   "options": {'never', 'on_sub'},
+                   "label": "When to send the last published item",
+                   "options": {
+                       "never": "Never",
+                       "on_sub": "When a new subscription is processed",
+                       }
+                  },
               }
 
     default_config = {"pubsub#persist_items": True,

@@ -36,7 +36,7 @@ class Storage:
         try:
             (configuration["pubsub#persist_items"],
              configuration["pubsub#deliver_payloads"],
-             configuration["pubsub#send_last_published_item") = \
+             configuration["pubsub#send_last_published_item"]) = \
             cursor.fetchone()
         except TypeError:
             raise error.NodeNotFound()
