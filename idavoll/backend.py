@@ -183,7 +183,7 @@ class BackendService(service.Service, utility.EventDispatcher):
                           '//event/pubsub/notify')
 
         config = node.get_configuration()
-        if config["pubsub#send_last_published_item"] != 'on_sub':
+        if config.get("pubsub#send_last_published_item", 'never') != 'on_sub':
             return
 
         d = self.get_items(node.id, subscriber.userhostJID(), 1)

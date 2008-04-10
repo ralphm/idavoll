@@ -10,6 +10,7 @@ from idavoll import error, iidavoll
 
 default_config = {"pubsub#persist_items": True,
                   "pubsub#deliver_payloads": True,
+                  "pubsub#send_last_published_item": True,
                   "pubsub#node_type": "leaf"}
 
 class Storage:
