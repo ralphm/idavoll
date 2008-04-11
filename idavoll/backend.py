@@ -9,9 +9,9 @@ from zope.interface import implements
 
 from twisted.application import service
 from twisted.python import components
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.words.protocols.jabber.error import StanzaError
-from twisted.words.xish import utility
+from twisted.words.xish import domish, utility
 
 from wokkel.iwokkel import IDisco, IPubSubService
 from wokkel.pubsub import PubSubService, PubSubError
@@ -182,14 +182,36 @@ class BackendService(service.Service, utility.EventDispatcher):
         return node_id, result
 
     def _send_last_published(self, node, subscriber):
-        def notify_item(items):
-            if not items:
+        class StringParser(object):
+            def __init__(self):
+                self.elementStream = domish.elementStream()
+                self.elementStream.DocumentStartEvent = self.docStart
+                self.elementStream.ElementEvent = self.elem
+                self.elementStream.DocumentEndEvent = self.docEnd
+
+            def docStart(self, elem):
+                self.document = elem
+
+            def elem(self, elem):
+                self.document.addChild(elem)
+
+            def docEnd(self):
+                pass
+
+            def parse(self, string):
+                self.elementStream.parse(string)
+                return self.document
+
+        def notify_item(result):
+            if not result:
                 return
 
-            self.dispatch({'items': items,
-                           'node_id': node.id,
-                           'subscriber': subscriber},
-                          '//event/pubsub/notify')
+            items = [domish.SerializedXML(item) for item in result]
+
+            reactor.callLater(0, self.dispatch, {'items': items,
+                                                 'node_id': node.id,
+                                                 'subscriber': subscriber},
+                                                 '//event/pubsub/notify')
 
         config = node.get_configuration()
         if config.get("pubsub#send_last_published_item", 'never') != 'on_sub':

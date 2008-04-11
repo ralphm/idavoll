@@ -49,9 +49,9 @@ def makeService(config):
                                                config['jid'])
     root.child_publish = gateway.PublishResource(bs, config['jid'],
                                                  config['jid'])
+    root.child_list = gateway.ListResource(bs)
     root.child_subscribe = gateway.SubscribeResource(ss)
     root.child_unsubscribe = gateway.UnsubscribeResource(ss)
-    root.child_list = gateway.ListResource(ss)
 
     site = server.Site(root)
     w = internet.TCPServer(int(config['webport']), channel.HTTPFactory(site))
