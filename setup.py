@@ -14,6 +14,7 @@ setup(name='idavoll',
       license='MIT',
       packages=[
           'idavoll',
+          'idavoll.test',
           'twisted.plugins',
       ],
       package_data={'twisted.plugins': ['twisted/plugins/idavoll.py']}
