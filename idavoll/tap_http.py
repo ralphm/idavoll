@@ -40,9 +40,11 @@ def makeService(config):
     ss.setHandlerParent(cs)
     ss.startService()
 
-    # Set up web service that exposes the backend using REST
+    # Set up web service
 
     root = resource.Resource()
+
+    # Set up resources that exposes the backend
     root.child_create = gateway.CreateResource(bs, config['jid'],
                                                config['jid'])
     root.child_delete = gateway.DeleteResource(bs, config['jid'],
@@ -50,8 +52,11 @@ def makeService(config):
     root.child_publish = gateway.PublishResource(bs, config['jid'],
                                                  config['jid'])
     root.child_list = gateway.ListResource(bs)
-    root.child_subscribe = gateway.SubscribeResource(ss)
-    root.child_unsubscribe = gateway.UnsubscribeResource(ss)
+
+    # Set up resources for accessing remote pubsub nodes.
+    root.child_subscribe = gateway.RemoteSubscribeResource(ss)
+    root.child_unsubscribe = gateway.RemoteUnsubscribeResource(ss)
+    root.child_items = gateway.RemoteItemsResource(ss)
 
     site = server.Site(root)
     w = internet.TCPServer(int(config['webport']), channel.HTTPFactory(site))

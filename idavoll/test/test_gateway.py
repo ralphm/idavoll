@@ -148,3 +148,17 @@ class GatewayTest(unittest.TestCase):
         self.assertFailure(d, error.Error)
         d.addCallback(cb)
         return d
+
+    def test_items(self):
+        def cb(response):
+            xmppURI = response['uri']
+            d = self.client.items(xmppURI)
+            return d
+
+        def cb2(result):
+            return
+
+        d = self.client.publish(entry)
+        d.addCallback(cb)
+        d.addCallback(cb2)
+        return d
