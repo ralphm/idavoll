@@ -587,7 +587,7 @@ class RemoteItemsResource(resource.Resource):
             return http.StatusResponse(responsecode.NOT_FOUND,
                                        "Node not found")
 
-        d = self.service.items(jid, nodeIdentifier)
+        d = self.service.items(jid, nodeIdentifier, maxItems)
         d.addCallback(respond)
         d.addErrback(trapNotFound)
         return d
@@ -722,7 +722,7 @@ class GatewayClient(service.Service):
     def items(self, xmppURI, maxItems=None):
         query = {'uri': xmppURI}
         if maxItems:
-             query['maxItems'] = int(maxItems)
+             query['max_items'] = int(maxItems)
         f = getPageWithFactory(self._makeURI('items', query),
                     method='GET',
                     agent=self.agent)
