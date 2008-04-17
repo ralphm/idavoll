@@ -132,7 +132,6 @@ class BackendTest(unittest.TestCase):
                 return defer.succeed(testNode())
 
         def cb(data):
-            print [ITEM] == data['items']
             self.assertEquals('node', data['node_id'])
             self.assertEquals([ITEM], data['items'])
             self.assertEquals(OWNER, data['subscriber'])

@@ -370,13 +370,24 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
             self.callbacks[jid, nodeIdentifier] = callbackList
             return callbackList
 
+        def callbackForLastItem(items, callback):
+            atomEntries = extractAtomEntries(items)
+
+            if not atomEntries:
+                return
+
+            self._postTo([callback], jid, nodeIdentifier, atomEntries[0],
+                         'application/atom+xml;type=entry')
+
         try:
             callbackList = self.callbacks[jid, nodeIdentifier]
         except KeyError:
             d = self.subscribe(jid, nodeIdentifier, self.jid)
             d.addCallback(newCallbackList)
         else:
-            d = defer.succeed(callbackList)
+            d = self.items(jid, nodeIdentifier, 1)
+            d.addCallback(callbackForLastItem, callback)
+            d.addCallback(lambda _: callbackList)
 
         d.addCallback(lambda callbackList: callbackList.add(callback))
         d.addErrback(self.trapNotFound)
@@ -415,8 +426,7 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
             payload = constructFeed(service, nodeIdentifier, atomEntries,
                                     title='Received item collection')
 
-        self.callCallbacks(recipient, service, nodeIdentifier, payload,
-                           contentType)
+        self.callCallbacks(service, nodeIdentifier, payload, contentType)
 
 
     def deleteReceived(self, recipient, service, nodeIdentifier):
@@ -424,17 +434,11 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         Fire up HTTP client to do callback
         """
 
-        self.callCallbacks(recipient, service, nodeIdentifier,
-                           eventType='DELETED')
+        self.callCallbacks(service, nodeIdentifier, eventType='DELETED')
 
 
-    def callCallbacks(self, recipient, service, nodeIdentifier,
-                            payload=None, contentType=None, eventType=None):
-        try:
-            callbacks = self.callbacks[service, nodeIdentifier]
-        except KeyError:
-            return
-
+    def _postTo(self, callbacks, service, nodeIdentifier,
+                      payload=None, contentType=None, eventType=None):
         postdata = None
         nodeURI = 'xmpp:%s?;node=%s' % (service.full(), nodeIdentifier)
         headers = {'Referer': nodeURI.encode('utf-8'),
@@ -457,6 +461,17 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
 
         for callbackURI in callbacks:
             reactor.callLater(0, postNotification, callbackURI)
+
+    def callCallbacks(self, service, nodeIdentifier,
+                            payload=None, contentType=None, eventType=None):
+        try:
+            callbacks = self.callbacks[service, nodeIdentifier]
+        except KeyError:
+            return
+
+        self._postTo(callbacks, service, nodeIdentifier, payload, contentType,
+                     eventType)
+
 
 
 

@@ -29,6 +29,7 @@ baseURI = "http://localhost:8086/"
 componentJID = "test.ik.nu"
 
 class GatewayTest(unittest.TestCase):
+    timeout = 2
 
     def setUp(self):
         self.client = gateway.GatewayClient(baseURI)
@@ -139,6 +140,54 @@ class GatewayTest(unittest.TestCase):
         d.addCallback(cb)
         d.addCallback(cb2)
         return defer.gatherResults([d, self.client.deferred])
+
+    def test_subscribeGetDelayedNotification2(self):
+        """
+        Test that subscribing as second results in a notification being sent.
+        """
+
+        def onNotification1(data, headers):
+            client1.deferred.callback(None)
+            client1.stopService()
+
+        def onNotification2(data, headers):
+            client2.deferred.callback(None)
+            client2.stopService()
+
+        def cb(response):
+            xmppURI = response['uri']
+            self.assertNot(client1.deferred.called)
+            self.assertNot(client2.deferred.called)
+            d = self.client.publish(entry, xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb2(xmppURI):
+            d = client1.subscribe(xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb3(xmppURI):
+            d = client2.subscribe(xmppURI)
+            return d
+
+        client1 = gateway.GatewayClient(baseURI, callbackPort=8088)
+        client1.startService()
+        client1.callback = onNotification1
+        client1.deferred = defer.Deferred()
+        client2 = gateway.GatewayClient(baseURI, callbackPort=8089)
+        client2.startService()
+        client2.callback = onNotification2
+        client2.deferred = defer.Deferred()
+
+
+        d = self.client.create()
+        d.addCallback(cb)
+        d.addCallback(cb2)
+        d.addCallback(cb3)
+        dl = defer.gatherResults([d, client1.deferred, client2.deferred])
+        return dl
+
 
     def test_subscribeNonExisting(self):
         def cb(err):
