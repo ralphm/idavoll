@@ -1,4 +1,4 @@
-Idavoll 0.6.0
+Idavoll 0.7.0
 
 What is this?
 ================
@@ -14,8 +14,8 @@ Current Status
 There are two different backends: one using PostgreSQL for storage, and one
 just keeping everything in memory.
 
-In Idavoll the mimimal requirements of JEP-0060 version 1.9 are implemented
-plus most optional features, as returned by Service Discovery.
+In Idavoll the mimimal requirements of JEP-0060 version 1.11 are implemented
+plus a number of optional features, as returned by Service Discovery.
 
 Installing
 ==========
@@ -26,7 +26,7 @@ INSTALL.
 Copyright
 =========
 
-All of the code in this distribution is Copyright (c) 2003-2007 Ralph Meijer.
+All of the code in this distribution is Copyright (c) 2003-2008 Ralph Meijer.
 
 Idavoll is made available under the MIT license. The included LICENSE file
 describes this in detail.
@@ -34,7 +34,9 @@ describes this in detail.
 Contact
 =======
 
-Questions, comments or suggestions are welcome!
+Questions, comments or suggestions are welcome! There is a mailing list for
+Jabber related Twisted development at mailto:twisted-jabber@ik.nu. The list's
+info page lives here: https://mailman.ik.nu/mailman/listinfo/twisted-jabber.
 
 Ralph Meijer
 <xmpp:ralphm@ik.nu>

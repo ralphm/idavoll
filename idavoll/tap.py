@@ -12,7 +12,7 @@ from wokkel.iwokkel import IPubSubService
 
 from idavoll.backend import BackendService
 
-__version__ = '0.6.0'
+__version__ = '0.7.0'
 
 class Options(usage.Options):
     optParameters = [

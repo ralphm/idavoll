@@ -1,4 +1,21 @@
+0.7.0 (2008-04-22)
+==================
+
+ - Depend on Wokkel for XMPP protocol implementations (#4).
+ - Depend on the uuid module that ships with Python 2.5 and can be installed
+   for older versions from http://pypi.python.org/pypi/uuid.
+ - Provide twistd parameters for connecting to a remote PostgreSQL
+   database (#6).
+ - Add support for node deletion notifications.
+ - Optionally send the last published item on subscription.
+ - Add an HTTP gateway (accessible via a separate twistd plugin) that allows
+   for creating new nodes, publishing to nodes locally and subscribing to
+   remote nodes through HTTP. See http://idavoll.ik.nu/wiki/HTTP_Interface.
+ - Miscellaneous fixes (#7, #9).
+
+
 0.6.0 (2007-01-18)
+==================
 
  - Improve error handling by using stanza error support in Twisted Words 0.4.0.
  - Bring errors up to date with version 1.8 of JEP-0060.
@@ -7,6 +24,7 @@
  - Fully comply with access model 'open'. 
  - Add --dbpass option for PostgreSQL backend.
  - Fix import incompatibility with Twisted Words 0.5.0 (#3).
+
 
 0.5.0 (2006-08-17)
 ==================
