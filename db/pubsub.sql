@@ -7,9 +7,9 @@ create table nodes (
     id serial primary key,
     node text not null unique,
     persistent boolean not null default true,
-    deliver_payload boolean not null default true
+    deliver_payload boolean not null default true,
     send_last_published_item text not null default 'on_sub'
-        check (send_last_published_item in ('never', 'on_sub')),
+        check (send_last_published_item in ('never', 'on_sub'))
 );
 
 create table affiliations (
