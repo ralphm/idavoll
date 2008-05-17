@@ -24,9 +24,8 @@ entry.addElement("title", content="Atom-Powered Robots Run Amok")
 entry.addElement("author").addElement("name", content="John Doe")
 entry.addElement("content", content="Some text.")
 
-#baseURI = "http://pubsub-test.ik.nu/"
 baseURI = "http://localhost:8086/"
-componentJID = "test.ik.nu"
+componentJID = "pubsub.localhost"
 
 class GatewayTest(unittest.TestCase):
     timeout = 2
@@ -191,9 +190,19 @@ class GatewayTest(unittest.TestCase):
 
     def test_subscribeNonExisting(self):
         def cb(err):
-            self.assertEqual('404', err.status)
+            self.assertEqual('403', err.status)
 
         d = self.client.subscribe('xmpp:%s?node=test' % componentJID)
+        self.assertFailure(d, error.Error)
+        d.addCallback(cb)
+        return d
+
+
+    def test_unsubscribeNonExisting(self):
+        def cb(err):
+            self.assertEqual('403', err.status)
+
+        d = self.client.unsubscribe('xmpp:%s?node=test' % componentJID)
         self.assertFailure(d, error.Error)
         d.addCallback(cb)
         return d

@@ -491,6 +491,12 @@ class RemoteSubscribeBaseResource(resource.Resource):
                          request to this resource.
     """
     serviceMethod = None
+    errorMap = {
+            error.NodeNotFound:
+                (responsecode.FORBIDDEN, "Node not found"),
+            error.NotSubscribed:
+                (responsecode.FORBIDDEN, "No such subscription found"),
+    }
 
     def __init__(self, service):
         self.service = service
@@ -502,9 +508,9 @@ class RemoteSubscribeBaseResource(resource.Resource):
 
     def http_POST(self, request):
         def trapNotFound(failure):
-            failure.trap(error.NodeNotFound)
-            return http.StatusResponse(responsecode.NOT_FOUND,
-                                       "Node not found")
+            err = failure.trap(*self.errorMap.keys())
+            code, msg = self.errorMap[err]
+            return http.StatusResponse(code, msg)
 
         def respond(result):
             return http.Response(responsecode.NO_CONTENT)
@@ -727,6 +733,18 @@ class GatewayClient(service.Service):
                   'callback': 'http://%s:%s/callback' % (self.callbackHost,
                                                          self.callbackPort)}
         f = getPageWithFactory(self._makeURI('subscribe'),
+                    method='POST',
+                    postdata=simplejson.dumps(params),
+                    headers={'Content-Type': MIME_JSON},
+                    agent=self.agent)
+        return f.deferred
+
+
+    def unsubscribe(self, xmppURI):
+        params = {'uri': xmppURI,
+                  'callback': 'http://%s:%s/callback' % (self.callbackHost,
+                                                         self.callbackPort)}
+        f = getPageWithFactory(self._makeURI('unsubscribe'),
                     method='POST',
                     postdata=simplejson.dumps(params),
                     headers={'Content-Type': MIME_JSON},
