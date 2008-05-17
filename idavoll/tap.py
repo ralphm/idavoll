@@ -12,7 +12,7 @@ from wokkel.iwokkel import IPubSubService
 
 from idavoll.backend import BackendService
 
-__version__ = '0.7.0'
+__version__ = '0.7.2'
 
 class Options(usage.Options):
     optParameters = [
@@ -21,11 +21,11 @@ class Options(usage.Options):
         ('rhost', None, '127.0.0.1', 'Jabber server host'),
         ('rport', None, '5347', 'Jabber server port'),
         ('backend', None, 'memory', 'Choice of storage backend'),
-        ('dbuser', None, '', 'Database user (pgsql backend)'),
+        ('dbuser', None, None, 'Database user (pgsql backend)'),
         ('dbname', None, 'pubsub', 'Database name (pgsql backend)'),
-        ('dbpass', None, '', 'Database password (pgsql backend)'),
-        ('dbhost', None, '', 'Database host (pgsql backend)'),
-        ('dbport', None, '', 'Database port (pgsql backend)'),
+        ('dbpass', None, None, 'Database password (pgsql backend)'),
+        ('dbhost', None, None, 'Database host (pgsql backend)'),
+        ('dbport', None, None, 'Database port (pgsql backend)'),
     ]
 
     optFlags = [
