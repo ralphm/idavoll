@@ -1,7 +1,10 @@
-x.x.x (yyyy-mm-dd)
+0.7.3 (2008-05-30)
 ==================
 
  - Return appropriate HTTP status codes on failed un-/subscription.
+ - Use ServiceMaker to setup twistd plugins, available as of Twisted 8.1.0.
+ - Require simplejson through setup.py.
+ - Update installation and configuration documentation in INSTALL.
 
 
 0.7.2 (2008-05-16)

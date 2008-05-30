@@ -1,41 +1,124 @@
 Requirements
 ============
 
-- Twisted >= 8.0.1
+- Twisted >= 8.0.1:
+   - Twisted Core
+   - Twisted Conch (for idavoll-http)
+   - Twisted Web (for idavoll-http)
+   - Twisted Web2 (for idavoll-http)
+   - Twisted Words
 - uuid.py (Python 2.5 std. lib. or http://pypi.python.org/pypi/uuid)
-- A Jabber server that supports the component protocol (JEP-0114)
 - Wokkel >= 0.3.1 (http://wokkel.ik.nu/)
+- simplejson (for idavoll-http)
+- A Jabber server that supports the component protocol (XEP-0114)
 
 For the PostgreSQL backend, the following is also required:
 
 - PostgreSQL
 - pyPgSQL
 
+
 Installation
 ============
 
-Run:
+Idavoll uses setuptools for package building and installing, and is also
+available through the Python Package Index (pypi). The easiest way to
+install idavoll is:
+
+  easy_install idavoll
+
+This will pull down the dependencies, if needed, except for the Twisted
+packages.
+
+To building from source run:
+
+  python setup.py build
+
+Then, to install run the following, possibly as root:
 
   python setup.py install
+
+See the setuptools documentation for further information on changing
+installation locations.
+
 
 Configuration
 =============
 
-The configuration file is created using Twisted's mktap, which needs a number
-of parameters:
+Idavoll uses Twisted's twistd command for running its services. Starting with
+Twisted 2.5.0, twistd supports running Twisted Application Plugins directly,
+without the use of mktap. In Twisted 8.1.0, the use of mktap for configuration
+is deprecated. These instructions will not cover the use of mktap anymore, but
+you can use TAC files to store a configuration, as described near the end
+of this document.
+
+Idavoll provides two types of storage for the backend: a memory-based storage
+facility, which is volatile, and a persistent storage facility using
+PostgreSQL. By default, the memory backend is used.
+
+For using the PostgreSQL backend, create a database (for example named pubsub)
+like so:
+
+  createdb pubsub
+  psql pubsub <db/pubsub.sql
+
+To use this backend, add the --backend=pgsql parameter to twistd, along
+with the optional connection parameters (see twistd idavoll --help).
+
+Your Jabber server must also be configured to accept component connections,
+see below for details.
+
+
+Running Idavoll
+===============
+
+Idavoll provides two twistd plugins: idavoll and idavoll-http. The former
+provides a generic publish-subscribe service, and the latter adds to that an
+HTTP interface to access some of the features of the Idavoll backend, and also
+provides a way to subscribe to, and receive notifications from, remote
+publish-subscribe nodes.
+
+The minimal example for running idavoll is:
+
+  twistd idavoll
+
+This will start the service and run it in the background. It generates a
+file twistd.pid that holds the PID of the service and a log file twistd.log.
+The twistd utility has a fair number of options that might be useful, and
+can be viewed with:
+
+  twistd --help
+
+When the service starts, it will connect to the Jabber server at the local
+machine using the component protocol, and assumes the JID 'pubsub'. This
+assumes a couple of defaults which can be overridden by passing parameters to
+the twistd plugin. You can get an overview of the parameters and their defaults
+using:
+
+  twistd idavoll --help
+
+In particular, the following parameters will be of interest:
 
  --jid: The Jabber ID the component will assume.
  --rport: the port number of the Jabber server to connect to
  --secret: the secret used to authenticate with the Jabber server.
  --backend: the backend storage facility to be used (memory or PostgreSQL).
 
-The default settings of mktap for Idavoll use the memory database and assume
-the default settings of jabberd 2.x for --rport and --secret.
+The defaults for Idavoll use the memory database and assume the default
+settings of jabberd 2.x for --rport and --secret.
+
+You may also want to provide the --verbose flag to see the traffic flow,
+for example to debug the configuration. Below some specifics for the
+different Jabber server implementations.
+
 
 jabberd 2.x
 ===========
+
 You can use the 'legacy' component support that defaults to port 5347 with
-secret 'secret'. You do not need to add anything specific for this service.
+secret 'secret'. These are the defaults of Idavoll, so you don't need to
+alter the connection details with a default jabberd 2.x install.
+
 
 jabberd 1.4.x
 =============
@@ -57,36 +140,18 @@ For other server implementations, please refer to its documentation on
 how to interact with server side components using the protocol defined in
 JEP-0114.
 
-Then, in the same directory as this file run:
+Then, you can start Idavoll with:
 
-  mktap idavoll --rport=5347 --jid=pubsub.localhost --secret=secret
+  twistd idavoll --rport=5347 --jid=pubsub.localhost --secret=secret
 
 This uses the (default) memory based backend.
 
-For using the PostgreSQL backend, create a database (for example named pubsub)
-like so:
 
-  createdb pubsub
-  psql pubsub <db/pubsub.sql
+Using TAC files to store a configuration
+========================================
 
-To use this backend, add the --backend=pgsql parameter to mktap.
+Apart from the provided TAPs that can be run with twistd, you can also create
+a configuration file that can be used by twistd to start up Idavoll. You can
+find an example in doc/examples/idavoll.tac, which can be run using:
 
-For viewing all options, run:
-
-  mktap idavoll --help
-
-The generated file idavoll.tap now holds the configuration.
-
-Running
-=======
-
-Using the configuration file idavoll.tap, run:
-
-  twistd -of idavoll.tap
-
-This will start the service and run it in the background. It generates a
-file twistd.pid that holds the PID of the service and a log file twistd.log.
-The twistd utility has a fair number of options that might be useful, and
-can be viewed with:
-
-  twistd --help
+  twisted -y idavoll.tac 

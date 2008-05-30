@@ -6,13 +6,16 @@
 import sys
 from setuptools import setup
 
-install_requires = ['wokkel >= 0.3.1']
+install_requires = [
+    'wokkel >= 0.3.1',
+    'simplejson',
+]
 
 if sys.version_info < (2, 5):
     install_requires.append('uuid')
 
 setup(name='idavoll',
-      version='0.7.2',
+      version='0.7.3',
       description='Jabber Publish-Subscribe Service Component',
       author='Ralph Meijer',
       author_email='ralphm@ik.nu',
