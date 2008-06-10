@@ -248,7 +248,7 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def get_node_configuration(self, node_id):
         if not node_id:
-            raise error.NoRootNode()
+            return defer.fail(error.NoRootNode())
 
         d = self.storage.get_node(node_id)
         d.addCallback(lambda node: node.get_configuration())
@@ -269,16 +269,16 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def set_node_configuration(self, node_id, options, requestor):
         if not node_id:
-            raise error.NoRootNode()
+            return defer.fail(error.NoRootNode())
 
         for key, value in options.iteritems():
             if not self.options.has_key(key):
-                raise error.InvalidConfigurationOption()
+                return defer.fail(error.InvalidConfigurationOption())
             if self.options[key]["type"] == 'boolean':
                 try:
                     options[key] = bool(int(value))
                 except ValueError:
-                    raise error.InvalidConfigurationValue()
+                    return defer.fail(error.InvalidConfigurationValue())
 
         d = self.storage.get_node(node_id)
         d.addCallback(_get_affiliation, requestor)
