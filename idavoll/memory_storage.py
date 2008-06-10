@@ -8,7 +8,7 @@ from twisted.words.protocols.jabber import jid
 
 from idavoll import error, iidavoll
 
-default_config = {"pubsub#persist_items": True,
+defaultConfig = {"pubsub#persist_items": True,
                   "pubsub#deliver_payloads": True,
                   "pubsub#send_last_published_item": 'on_sub',
                   "pubsub#node_type": "leaf"}
@@ -20,90 +20,103 @@ class Storage:
     def __init__(self):
         self._nodes = {}
 
-    def get_node(self, node_id):
+
+    def getNode(self, nodeIdentifier):
         try:
-            node = self._nodes[node_id]
+            node = self._nodes[nodeIdentifier]
         except KeyError:
             return defer.fail(error.NodeNotFound())
 
         return defer.succeed(node)
 
-    def get_node_ids(self):
+
+    def getNodeIds(self):
         return defer.succeed(self._nodes.keys())
 
-    def create_node(self, node_id, owner, config=None):
-        if node_id in self._nodes:
+
+    def createNode(self, nodeIdentifier, owner, config=None):
+        if nodeIdentifier in self._nodes:
             return defer.fail(error.NodeExists())
 
         if not config:
-            config = copy.copy(default_config)
+            config = copy.copy(defaultConfig)
 
         if config['pubsub#node_type'] != 'leaf':
             raise NotImplementedError
 
-        node = LeafNode(node_id, owner, config)
-        self._nodes[node_id] = node
+        node = LeafNode(nodeIdentifier, owner, config)
+        self._nodes[nodeIdentifier] = node
 
         return defer.succeed(None)
 
-    def delete_node(self, node_id):
+
+    def deleteNode(self, nodeIdentifier):
         try:
-            del self._nodes[node_id]
+            del self._nodes[nodeIdentifier]
         except KeyError:
             return defer.fail(error.NodeNotFound())
 
         return defer.succeed(None)
 
-    def get_affiliations(self, entity):
+
+    def getAffiliations(self, entity):
         entity = entity.userhost()
-        return defer.succeed([(node.id, node._affiliations[entity])
+        return defer.succeed([(node.nodeIdentifier, node._affiliations[entity])
                               for name, node in self._nodes.iteritems()
                               if entity in node._affiliations])
 
-    def get_subscriptions(self, entity):
+
+    def getSubscriptions(self, entity):
         subscriptions = []
         for node in self._nodes.itervalues():
             for subscriber, subscription in node._subscriptions.iteritems():
                 subscriber = jid.internJID(subscriber)
                 if subscriber.userhostJID() == entity.userhostJID():
-                    subscriptions.append((node.id, subscriber,
+                    subscriptions.append((node.nodeIdentifier, subscriber,
                                           subscription.state))
 
         return defer.succeed(subscriptions)
+
 
 
 class Node:
 
     implements(iidavoll.INode)
 
-    def __init__(self, node_id, owner, config):
-        self.id = node_id
+    def __init__(self, nodeIdentifier, owner, config):
+        self.nodeIdentifier = nodeIdentifier
         self._affiliations = {owner.userhost(): 'owner'}
         self._subscriptions = {}
         self._config = config
 
-    def get_type(self):
-        return self.type
 
-    def get_configuration(self):
+    def getType(self):
+        return self.nodeType
+
+
+    def getConfiguration(self):
         return self._config
 
-    def get_meta_data(self):
+
+    def getMetaData(self):
         config = copy.copy(self._config)
-        config["pubsub#node_type"] = self.type
+        config["pubsub#node_type"] = self.nodeType
         return config
 
-    def set_configuration(self, options):
+
+    def setConfiguration(self, options):
         for option in options:
             if option in self._config:
                 self._config[option] = options[option]
 
         return defer.succeed(None)
 
-    def get_affiliation(self, entity):
+
+    def getAffiliation(self, entity):
         return defer.succeed(self._affiliations.get(entity.full()))
 
-    def get_subscription(self, subscriber):
+
+    def getSubscription(self, subscriber):
         try:
             subscription = self._subscriptions[subscriber.full()]
         except KeyError:
@@ -112,7 +125,8 @@ class Node:
             state = subscription.state
         return defer.succeed(state)
 
-    def add_subscription(self, subscriber, state):
+
+    def addSubscription(self, subscriber, state):
         if self._subscriptions.get(subscriber.full()):
             return defer.fail(error.SubscriptionExists())
 
@@ -120,7 +134,8 @@ class Node:
         self._subscriptions[subscriber.full()] = subscription
         return defer.succeed(None)
 
-    def remove_subscription(self, subscriber):
+
+    def removeSubscription(self, subscriber):
         try:
             del self._subscriptions[subscriber.full()]
         except KeyError:
@@ -128,14 +143,16 @@ class Node:
 
         return defer.succeed(None)
 
-    def get_subscribers(self):
+
+    def getSubscribers(self):
         subscribers = [jid.internJID(subscriber) for subscriber, subscription
                        in self._subscriptions.iteritems()
                        if subscription.state == 'subscribed']
 
         return defer.succeed(subscribers)
 
-    def is_subscribed(self, entity):
+
+    def isSubscribed(self, entity):
         for subscriber, subscription in self._subscriptions.iteritems():
             if jid.internJID(subscriber).userhost() == entity.userhost() and \
                     subscription.state == 'subscribed':
@@ -143,67 +160,74 @@ class Node:
 
         return defer.succeed(False)
 
-    def get_affiliations(self):
+
+    def getAffiliations(self):
         affiliations = [(jid.internJID(entity), affiliation) for entity, affiliation
                        in self._affiliations.iteritems()]
 
         return defer.succeed(affiliations)
 
 
+
 class LeafNodeMixin:
 
-    type = 'leaf'
+    nodeType = 'leaf'
 
     def __init__(self):
         self._items = {}
         self._itemlist = []
 
-    def store_items(self, items, publisher):
+
+    def storeItems(self, items, publisher):
         for data in items:
-            id = data["id"]
+            itemIdentifier = data["id"]
             data = data.toXml()
             if isinstance(data, str):
                 data = data.decode('utf-8')
             item = (data, publisher)
-            if id in self._items:
-                self._itemlist.remove(self._items[id])
-            self._items[id] = item
+            if itemIdentifier in self._items:
+                self._itemlist.remove(self._items[itemIdentifier])
+            self._items[itemIdentifier] = item
             self._itemlist.append(item)
 
         return defer.succeed(None)
 
-    def remove_items(self, item_ids):
+
+    def removeItems(self, itemIdentifiers):
         deleted = []
 
-        for item_id in item_ids:
+        for itemIdentifier in itemIdentifiers:
             try:
-                item = self._items[item_id]
+                item = self._items[itemIdentifier]
             except KeyError:
                 pass
             else:
                 self._itemlist.remove(item)
-                del self._items[item_id]
-                deleted.append(item_id)
+                del self._items[itemIdentifier]
+                deleted.append(itemIdentifier)
 
         return defer.succeed(deleted)
 
-    def get_items(self, max_items=None):
-        if max_items:
-            list = self._itemlist[-max_items:]
+
+    def getItems(self, maxItems=None):
+        if maxItems:
+            list = self._itemlist[-maxItems:]
         else:
             list = self._itemlist
         return defer.succeed([item[0] for item in list])
 
-    def get_items_by_id(self, item_ids):
+
+    def getItemsById(self, itemIdentifiers):
         items = []
-        for item_id in item_ids:
+        for itemIdentifier in itemIdentifiers:
             try:
-                item = self._items[item_id]
+                item = self._items[itemIdentifier]
             except KeyError:
                 pass
             else:
                 items.append(item[0])
         return defer.succeed(items)
+
 
     def purge(self):
         self._items = {}
@@ -212,13 +236,15 @@ class LeafNodeMixin:
         return defer.succeed(None)
 
 
+
 class LeafNode(Node, LeafNodeMixin):
 
     implements(iidavoll.ILeafNode)
 
-    def __init__(self, node_id, owner, config):
-        Node.__init__(self, node_id, owner, config)
+    def __init__(self, nodeIdentifier, owner, config):
+        Node.__init__(self, nodeIdentifier, owner, config)
         LeafNodeMixin.__init__(self)
+
 
 
 class Subscription:

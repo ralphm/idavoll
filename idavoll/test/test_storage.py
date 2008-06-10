@@ -40,318 +40,353 @@ def decode(object):
     return object
 
 
+
 class StorageTests:
 
     def _assignTestNode(self, node):
         self.node = node
 
+
     def setUp(self):
-        d = self.s.get_node('pre-existing')
+        d = self.s.getNode('pre-existing')
         d.addCallback(self._assignTestNode)
         return d
 
-    def testGetNode(self):
-        return self.s.get_node('pre-existing')
 
-    def testGetNonExistingNode(self):
-        d = self.s.get_node('non-existing')
+    def test_getNode(self):
+        return self.s.getNode('pre-existing')
+
+
+    def test_getNonExistingNode(self):
+        d = self.s.getNode('non-existing')
         self.assertFailure(d, error.NodeNotFound)
         return d
 
-    def testGetNodeIDs(self):
-        def cb(node_ids):
-            self.assertIn('pre-existing', node_ids)
-            self.assertNotIn('non-existing', node_ids)
 
-        return self.s.get_node_ids().addCallback(cb)
+    def test_getNodeIDs(self):
+        def cb(nodeIdentifiers):
+            self.assertIn('pre-existing', nodeIdentifiers)
+            self.assertNotIn('non-existing', nodeIdentifiers)
 
-    def testCreateExistingNode(self):
-        d = self.s.create_node('pre-existing', OWNER)
+        return self.s.getNodeIds().addCallback(cb)
+
+
+    def test_createExistingNode(self):
+        d = self.s.createNode('pre-existing', OWNER)
         self.assertFailure(d, error.NodeExists)
         return d
 
-    def testCreateNode(self):
+
+    def test_createNode(self):
         def cb(void):
-            d = self.s.get_node('new 1')
+            d = self.s.getNode('new 1')
             return d
 
-        d = self.s.create_node('new 1', OWNER)
+        d = self.s.createNode('new 1', OWNER)
         d.addCallback(cb)
         return d
 
-    def testDeleteNonExistingNode(self):
-        d = self.s.delete_node('non-existing')
+
+    def test_deleteNonExistingNode(self):
+        d = self.s.deleteNode('non-existing')
         self.assertFailure(d, error.NodeNotFound)
         return d
 
-    def testDeleteNode(self):
+
+    def test_deleteNode(self):
         def cb(void):
-            d = self.s.get_node('to-be-deleted')
+            d = self.s.getNode('to-be-deleted')
             self.assertFailure(d, error.NodeNotFound)
             return d
 
-        d = self.s.delete_node('to-be-deleted')
+        d = self.s.deleteNode('to-be-deleted')
         d.addCallback(cb)
         return d
 
-    def testGetAffiliations(self):
+
+    def test_getAffiliations(self):
         def cb(affiliations):
             self.assertIn(('pre-existing', 'owner'), affiliations)
 
-        d = self.s.get_affiliations(OWNER)
+        d = self.s.getAffiliations(OWNER)
         d.addCallback(cb)
         return d
 
-    def testGetSubscriptions(self):
+
+    def test_getSubscriptions(self):
         def cb(subscriptions):
             self.assertIn(('pre-existing', SUBSCRIBER, 'subscribed'), subscriptions)
 
-        d = self.s.get_subscriptions(SUBSCRIBER)
+        d = self.s.getSubscriptions(SUBSCRIBER)
         d.addCallback(cb)
         return d
 
+
     # Node tests
 
-    def testGetType(self):
-        self.assertEqual(self.node.get_type(), 'leaf')
+    def test_getType(self):
+        self.assertEqual(self.node.getType(), 'leaf')
 
-    def testGetConfiguration(self):
-        config = self.node.get_configuration()
+
+    def test_getConfiguration(self):
+        config = self.node.getConfiguration()
         self.assertIn('pubsub#persist_items', config.iterkeys())
         self.assertIn('pubsub#deliver_payloads', config.iterkeys())
         self.assertEqual(config['pubsub#persist_items'], True)
         self.assertEqual(config['pubsub#deliver_payloads'], True)
 
-    def testSetConfiguration(self):
-        def get_config(node):
-            d = node.set_configuration({'pubsub#persist_items': False})
+
+    def test_setConfiguration(self):
+        def getConfig(node):
+            d = node.setConfiguration({'pubsub#persist_items': False})
             d.addCallback(lambda _: node)
             return d
 
-        def check_object_config(node):
-            config = node.get_configuration()
+        def checkObjectConfig(node):
+            config = node.getConfiguration()
             self.assertEqual(config['pubsub#persist_items'], False)
 
-        def get_node(void):
-            return self.s.get_node('to-be-reconfigured')
+        def getNode(void):
+            return self.s.getNode('to-be-reconfigured')
 
-        def check_storage_config(node):
-            config = node.get_configuration()
+        def checkStorageConfig(node):
+            config = node.getConfiguration()
             self.assertEqual(config['pubsub#persist_items'], False)
 
-        d = self.s.get_node('to-be-reconfigured')
-        d.addCallback(get_config)
-        d.addCallback(check_object_config)
-        d.addCallback(get_node)
-        d.addCallback(check_storage_config)
+        d = self.s.getNode('to-be-reconfigured')
+        d.addCallback(getConfig)
+        d.addCallback(checkObjectConfig)
+        d.addCallback(getNode)
+        d.addCallback(checkStorageConfig)
         return d
 
-    def testGetMetaData(self):
-        meta_data = self.node.get_meta_data()
-        for key, value in self.node.get_configuration().iteritems():
-            self.assertIn(key, meta_data.iterkeys())
-            self.assertEqual(value, meta_data[key])
-        self.assertIn('pubsub#node_type', meta_data.iterkeys())
-        self.assertEqual(meta_data['pubsub#node_type'], 'leaf')
 
-    def testGetAffiliation(self):
+    def test_getMetaData(self):
+        metaData = self.node.getMetaData()
+        for key, value in self.node.getConfiguration().iteritems():
+            self.assertIn(key, metaData.iterkeys())
+            self.assertEqual(value, metaData[key])
+        self.assertIn('pubsub#node_type', metaData.iterkeys())
+        self.assertEqual(metaData['pubsub#node_type'], 'leaf')
+
+
+    def test_getAffiliation(self):
         def cb(affiliation):
             self.assertEqual(affiliation, 'owner')
 
-        d = self.node.get_affiliation(OWNER)
+        d = self.node.getAffiliation(OWNER)
         d.addCallback(cb)
         return d
 
-    def testGetNonExistingAffiliation(self):
+
+    def test_getNonExistingAffiliation(self):
         def cb(affiliation):
             self.assertEqual(affiliation, None)
 
-        d = self.node.get_affiliation(SUBSCRIBER)
+        d = self.node.getAffiliation(SUBSCRIBER)
         d.addCallback(cb)
         return d
 
-    def testAddSubscription(self):
+
+    def test_addSubscription(self):
         def cb1(void):
-            return self.node.get_subscription(SUBSCRIBER_NEW)
+            return self.node.getSubscription(SUBSCRIBER_NEW)
 
         def cb2(state):
             self.assertEqual(state, 'pending')
 
-        d = self.node.add_subscription(SUBSCRIBER_NEW, 'pending')
+        d = self.node.addSubscription(SUBSCRIBER_NEW, 'pending')
         d.addCallback(cb1)
         d.addCallback(cb2)
         return d
 
-    def testAddExistingSubscription(self):
-        d = self.node.add_subscription(SUBSCRIBER, 'pending')
+
+    def test_addExistingSubscription(self):
+        d = self.node.addSubscription(SUBSCRIBER, 'pending')
         self.assertFailure(d, error.SubscriptionExists)
         return d
 
-    def testGetSubscription(self):
+
+    def test_getSubscription(self):
         def cb(subscriptions):
             self.assertEquals(subscriptions[0][1], 'subscribed')
             self.assertEquals(subscriptions[1][1], 'pending')
             self.assertEquals(subscriptions[2][1], None)
 
-        d = defer.DeferredList([self.node.get_subscription(SUBSCRIBER),
-                                self.node.get_subscription(SUBSCRIBER_PENDING),
-                                self.node.get_subscription(OWNER)])
+        d = defer.DeferredList([self.node.getSubscription(SUBSCRIBER),
+                                self.node.getSubscription(SUBSCRIBER_PENDING),
+                                self.node.getSubscription(OWNER)])
         d.addCallback(cb)
         return d
 
-    def testRemoveSubscription(self):
-        return self.node.remove_subscription(SUBSCRIBER_TO_BE_DELETED)
 
-    def testRemoveNonExistingSubscription(self):
-        d = self.node.remove_subscription(OWNER)
+    def test_removeSubscription(self):
+        return self.node.removeSubscription(SUBSCRIBER_TO_BE_DELETED)
+
+
+    def test_removeNonExistingSubscription(self):
+        d = self.node.removeSubscription(OWNER)
         self.assertFailure(d, error.NotSubscribed)
         return d
 
-    def testGetSubscribers(self):
+
+    def test_getSubscribers(self):
         def cb(subscribers):
             self.assertIn(SUBSCRIBER, subscribers)
             self.assertNotIn(SUBSCRIBER_PENDING, subscribers)
             self.assertNotIn(OWNER, subscribers)
 
-        d = self.node.get_subscribers()
+        d = self.node.getSubscribers()
         d.addCallback(cb)
         return d
 
-    def testIsSubscriber(self):
+
+    def test_isSubscriber(self):
         def cb(subscribed):
             self.assertEquals(subscribed[0][1], True)
             self.assertEquals(subscribed[1][1], True)
             self.assertEquals(subscribed[2][1], False)
             self.assertEquals(subscribed[3][1], False)
 
-        d = defer.DeferredList([self.node.is_subscribed(SUBSCRIBER),
-                                self.node.is_subscribed(SUBSCRIBER.userhostJID()),
-                                self.node.is_subscribed(SUBSCRIBER_PENDING),
-                                self.node.is_subscribed(OWNER)])
+        d = defer.DeferredList([self.node.isSubscribed(SUBSCRIBER),
+                                self.node.isSubscribed(SUBSCRIBER.userhostJID()),
+                                self.node.isSubscribed(SUBSCRIBER_PENDING),
+                                self.node.isSubscribed(OWNER)])
         d.addCallback(cb)
         return d
 
-    def testStoreItems(self):
+
+    def test_storeItems(self):
         def cb1(void):
-            return self.node.get_items_by_id(['new'])
+            return self.node.getItemsById(['new'])
 
         def cb2(result):
             self.assertEqual(result[0], decode(ITEM_NEW.toXml()))
 
-        d = self.node.store_items([ITEM_NEW], PUBLISHER)
+        d = self.node.storeItems([ITEM_NEW], PUBLISHER)
         d.addCallback(cb1)
         d.addCallback(cb2)
         return d
 
-    def testStoreUpdatedItems(self):
+
+    def test_storeUpdatedItems(self):
         def cb1(void):
-            return self.node.get_items_by_id(['current'])
+            return self.node.getItemsById(['current'])
 
         def cb2(result):
             self.assertEqual(result[0], decode(ITEM_UPDATED.toXml()))
 
-        d = self.node.store_items([ITEM_UPDATED], PUBLISHER)
+        d = self.node.storeItems([ITEM_UPDATED], PUBLISHER)
         d.addCallback(cb1)
         d.addCallback(cb2)
         return d
 
-    def testRemoveItems(self):
+
+    def test_removeItems(self):
         def cb1(result):
             self.assertEqual(result, ['to-be-deleted'])
-            return self.node.get_items_by_id(['to-be-deleted'])
+            return self.node.getItemsById(['to-be-deleted'])
 
         def cb2(result):
             self.assertEqual(len(result), 0)
 
-        d = self.node.remove_items(['to-be-deleted'])
+        d = self.node.removeItems(['to-be-deleted'])
         d.addCallback(cb1)
         d.addCallback(cb2)
         return d
 
-    def testRemoveNonExistingItems(self):
+
+    def test_removeNonExistingItems(self):
         def cb(result):
             self.assertEqual(result, [])
 
-        d = self.node.remove_items(['non-existing'])
+        d = self.node.removeItems(['non-existing'])
         d.addCallback(cb)
         return d
 
-    def testGetItems(self):
+
+    def test_getItems(self):
         def cb(result):
             self.assertIn(decode(ITEM.toXml()), result)
 
-        d = self.node.get_items()
+        d = self.node.getItems()
         d.addCallback(cb)
         return d
 
-    def testLastItem(self):
+
+    def test_lastItem(self):
         def cb(result):
             self.assertEqual([decode(ITEM.toXml())], result)
 
-        d = self.node.get_items(1)
+        d = self.node.getItems(1)
         d.addCallback(cb)
         return d
 
-    def testGetItemsById(self):
+
+    def test_getItemsById(self):
         def cb(result):
             self.assertEqual(len(result), 1)
 
-        d = self.node.get_items_by_id(['current'])
+        d = self.node.getItemsById(['current'])
         d.addCallback(cb)
         return d
 
-    def testGetNonExistingItemsById(self):
+
+    def test_getNonExistingItemsById(self):
         def cb(result):
             self.assertEqual(len(result), 0)
 
-        d = self.node.get_items_by_id(['non-existing'])
+        d = self.node.getItemsById(['non-existing'])
         d.addCallback(cb)
         return d
 
-    def testPurge(self):
+
+    def test_purge(self):
         def cb1(node):
             d = node.purge()
             d.addCallback(lambda _: node)
             return d
 
         def cb2(node):
-            return node.get_items()
+            return node.getItems()
 
         def cb3(result):
             self.assertEqual([], result)
 
-        d = self.s.get_node('to-be-purged')
+        d = self.s.getNode('to-be-purged')
         d.addCallback(cb1)
         d.addCallback(cb2)
         d.addCallback(cb3)
         return d
 
-    def testGetNodeAffilatiations(self):
+
+    def test_getNodeAffilatiations(self):
         def cb1(node):
-            return node.get_affiliations()
+            return node.getAffiliations()
 
         def cb2(affiliations):
             affiliations = dict(((a[0].full(), a[1]) for a in affiliations))
             self.assertEquals(affiliations[OWNER.full()], 'owner')
 
-        d = self.s.get_node('pre-existing')
+        d = self.s.getNode('pre-existing')
         d.addCallback(cb1)
         d.addCallback(cb2)
         return d
+
 
 
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUp(self):
         from idavoll.memory_storage import Storage, LeafNode, Subscription, \
-                                           default_config
+                                           defaultConfig
         self.s = Storage()
         self.s._nodes['pre-existing'] = \
-                LeafNode('pre-existing', OWNER, default_config)
+                LeafNode('pre-existing', OWNER, defaultConfig)
         self.s._nodes['to-be-deleted'] = \
                 LeafNode('to-be-deleted', OWNER, None)
         self.s._nodes['to-be-reconfigured'] = \
-                LeafNode('to-be-reconfigured', OWNER, default_config)
+                LeafNode('to-be-reconfigured', OWNER, defaultConfig)
         self.s._nodes['to-be-purged'] = \
                 LeafNode('to-be-purged', OWNER, None)
 
@@ -374,9 +409,11 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         return StorageTests.setUp(self)
 
 
+
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
     def _callSuperSetUp(self, void):
         return StorageTests.setUp(self)
+
 
     def setUp(self):
         from idavoll.pgsql_storage import Storage
@@ -386,9 +423,11 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         d.addCallback(self._callSuperSetUp)
         return d
 
+
     def tearDownClass(self):
         #return self.s._dbpool.runInteraction(self.cleandb)
         pass
+
 
     def init(self, cursor):
         self.cleandb(cursor)
@@ -453,6 +492,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                           WHERE node='pre-existing'""",
                        (PUBLISHER.userhost(),
                         ITEM.toXml()))
+
 
     def cleandb(self, cursor):
         cursor.execute("""DELETE FROM nodes WHERE node in

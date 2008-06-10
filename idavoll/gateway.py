@@ -138,7 +138,7 @@ class CreateResource(resource.Resource):
             stream = simplejson.dumps({'uri': uri})
             return http.Response(responsecode.OK, stream=stream)
 
-        d = self.backend.create_node(None, self.owner)
+        d = self.backend.createNode(None, self.owner)
         d.addCallback(toResponse)
         return d
 
@@ -184,7 +184,7 @@ class DeleteResource(resource.Resource):
                     "Malformed XMPP URI: %s" % failure.value.message)
 
         d = getNode()
-        d.addCallback(self.backend.delete_node, self.owner)
+        d.addCallback(self.backend.deleteNode, self.owner)
         d.addCallback(respond)
         d.addErrback(trapNotFound)
         d.addErrback(trapXMPPURIParseError)
@@ -252,7 +252,7 @@ class PublishResource(resource.Resource):
                 jid, nodeIdentifier = getServiceAndNode(request.args['uri'][0])
                 return defer.succeed(nodeIdentifier)
             else:
-                return self.backend.create_node(None, self.owner)
+                return self.backend.createNode(None, self.owner)
 
         def doPublish(payload):
             d = getNode()
@@ -289,7 +289,7 @@ class ListResource(resource.Resource):
             return http.Response(responsecode.OK,
                                  stream=simplejson.dumps(nodeIdentifiers))
 
-        d = self.service.get_nodes()
+        d = self.service.getNodes()
         d.addCallback(responseFromNodes)
         return d
 
@@ -325,6 +325,8 @@ def extractAtomEntries(items):
 
     return atomEntries
 
+
+
 def constructFeed(service, nodeIdentifier, entries, title):
     nodeURI = 'xmpp:%s?;node=%s' % (service.full(), nodeIdentifier)
     now = strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
@@ -339,6 +341,8 @@ def constructFeed(service, nodeIdentifier, entries, title):
         feed.addChild(entry)
 
     return feed
+
+
 
 class RemoteSubscriptionService(service.Service, PubSubClient):
     """
@@ -572,6 +576,7 @@ class RemoteItemsResource(resource.Resource):
     def __init__(self, service):
         self.service = service
 
+
     def render(self, request):
         try:
             maxItems = int(request.args.get('max_items', [0])[0]) or None
@@ -580,14 +585,16 @@ class RemoteItemsResource(resource.Resource):
                     "The argument max_items has an invalid value.")
 
         try:
-            jid, nodeIdentifier = getServiceAndNode(request.args['uri'][0])
+            uri = request.args['uri'][0]
         except KeyError:
             return http.StatusResponse(responsecode.BAD_REQUEST,
                     "No URI for the remote node provided.")
+
+        try:
+            jid, nodeIdentifier = getServiceAndNode(uri)
         except XMPPURIParseError:
             return http.StatusResponse(responsecode.BAD_REQUEST,
-                    "Malformed XMPP URI: %s" % failure.value.message)
-
+                    "Malformed XMPP URI: %s" % uri)
 
         def respond(items):
             """Create a feed out the retrieved items."""

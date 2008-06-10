@@ -25,7 +25,7 @@ entry.addElement("author").addElement("name", content="John Doe")
 entry.addElement("content", content="Some text.")
 
 baseURI = "http://localhost:8086/"
-componentJID = "pubsub.localhost"
+componentJID = "pubsub"
 
 class GatewayTest(unittest.TestCase):
     timeout = 2

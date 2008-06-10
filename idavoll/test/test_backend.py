@@ -18,51 +18,52 @@ OWNER = jid.JID('owner@example.com')
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 
 class BackendTest(unittest.TestCase):
-    def test_delete_node(self):
+    def test_deleteNode(self):
         class testNode:
-            id = 'to-be-deleted'
-            def get_affiliation(self, entity):
+            nodeIdentifier = 'to-be-deleted'
+            def getAffiliation(self, entity):
                 if entity is OWNER:
                     return defer.succeed('owner')
 
         class testStorage:
-            def get_node(self, node_id):
+            def getNode(self, nodeIdentifier):
                 return defer.succeed(testNode())
 
-            def delete_node(self, node_id):
-                if node_id in ['to-be-deleted']:
-                    self.delete_called = True
+            def deleteNode(self, nodeIdentifier):
+                if nodeIdentifier in ['to-be-deleted']:
+                    self.deleteCalled = True
                     return defer.succeed(None)
                 else:
                     return defer.fail(error.NodeNotFound())
 
-        def pre_delete(node_id):
-            self.pre_delete_called = True
+        def preDelete(nodeIdentifier):
+            self.preDeleteCalled = True
             return defer.succeed(None)
 
         def cb(result):
-            self.assertTrue(self.pre_delete_called)
-            self.assertTrue(self.storage.delete_called)
+            self.assertTrue(self.preDeleteCalled)
+            self.assertTrue(self.storage.deleteCalled)
 
         self.storage = testStorage()
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
-        self.pre_delete_called = False
-        self.delete_called = False
+        self.preDeleteCalled = False
+        self.deleteCalled = False
 
-        self.backend.register_pre_delete(pre_delete)
-        d = self.backend.delete_node('to-be-deleted', OWNER)
+        self.backend.registerPreDelete(preDelete)
+        d = self.backend.deleteNode('to-be-deleted', OWNER)
         d.addCallback(cb)
         return d
 
-    def test_create_nodeNoID(self):
+
+    def test_createNodeNoID(self):
         """
         Test creation of a node without a given node identifier.
         """
         class testStorage:
-            def create_node(self, node_id, requestor):
-                self.node_id = node_id
+            def createNode(self, nodeIdentifier, requestor):
+                self.nodeIdentifier = nodeIdentifier
                 return defer.succeed(None)
 
         self.storage = testStorage()
@@ -71,27 +72,28 @@ class BackendTest(unittest.TestCase):
 
         def checkID(nodeIdentifier):
             self.assertNotIdentical(None, nodeIdentifier)
-            self.assertIdentical(self.storage.node_id, nodeIdentifier)
+            self.assertIdentical(self.storage.nodeIdentifier, nodeIdentifier)
 
-        d = self.backend.create_node(None, OWNER)
+        d = self.backend.createNode(None, OWNER)
         d.addCallback(checkID)
         return d
+
 
     def test_publishNoID(self):
         """
         Test publish request with an item without a node identifier.
         """
         class testNode:
-            id = 'node'
-            def get_affiliation(self, entity):
+            nodeIdentifier = 'node'
+            def getAffiliation(self, entity):
                 if entity is OWNER:
                     return defer.succeed('owner')
-            def get_configuration(self):
+            def getConfiguration(self):
                 return {'pubsub#deliver_payloads': True,
                         'pubsub#persist_items': False}
 
         class testStorage:
-            def get_node(self, node_id):
+            def getNode(self, nodeIdentifier):
                 return defer.succeed(testNode())
 
         def checkID(notification):
@@ -101,11 +103,12 @@ class BackendTest(unittest.TestCase):
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
-        self.backend.register_notifier(checkID)
+        self.backend.registerNotifier(checkID)
 
         items = [pubsub.Item()]
         d = self.backend.publish('node', items, OWNER)
         return d
+
 
     def test_notifyOnSubscription(self):
         """
@@ -114,25 +117,25 @@ class BackendTest(unittest.TestCase):
         ITEM = "<item xmlns='%s' id='1'/>" % NS_PUBSUB
 
         class testNode:
-            id = 'node'
-            def get_affiliation(self, entity):
+            nodeIdentifier = 'node'
+            def getAffiliation(self, entity):
                 if entity is OWNER:
                     return defer.succeed('owner')
-            def get_configuration(self):
+            def getConfiguration(self):
                 return {'pubsub#deliver_payloads': True,
                         'pubsub#persist_items': False,
                         'pubsub#send_last_published_item': 'on_sub'}
-            def get_items(self, max_items):
+            def getItems(self, maxItems):
                 return [ITEM]
-            def add_subscription(self, subscriber, state):
+            def addSubscription(self, subscriber, state):
                 return defer.succeed(None)
 
         class testStorage:
-            def get_node(self, node_id):
+            def getNode(self, nodeIdentifier):
                 return defer.succeed(testNode())
 
         def cb(data):
-            self.assertEquals('node', data['node_id'])
+            self.assertEquals('node', data['nodeIdentifier'])
             self.assertEquals([ITEM], data['items'])
             self.assertEquals(OWNER, data['subscriber'])
 
@@ -142,11 +145,12 @@ class BackendTest(unittest.TestCase):
 
         d1 = defer.Deferred()
         d1.addCallback(cb)
-        self.backend.register_notifier(d1.callback)
+        self.backend.registerNotifier(d1.callback)
         d2 = self.backend.subscribe('node', OWNER, OWNER)
         return defer.gatherResults([d1, d2])
 
     test_notifyOnSubscription.timeout = 2
+
 
 
 class BaseTestBackend(object):
@@ -154,23 +158,29 @@ class BaseTestBackend(object):
     Base class for backend stubs.
     """
 
-    def supports_publisher_affiliation(self):
+    def supportsPublisherAffiliation(self):
         return True
 
-    def supports_outcast_affiliation(self):
+
+    def supportsOutcastAffiliation(self):
         return True
 
-    def supports_persistent_items(self):
+
+    def supportsPersistentItems(self):
         return True
 
-    def supports_instant_nodes(self):
+
+    def supportsInstantNodes(self):
         return True
 
-    def register_notifier(self, observerfn, *args, **kwargs):
+
+    def registerNotifier(self, observerfn, *args, **kwargs):
         return
 
-    def register_pre_delete(self, pre_delete_fn):
+
+    def registerPreDelete(self, preDeleteFn):
         return
+
 
 
 class PubSubServiceFromBackendTest(unittest.TestCase):
@@ -193,16 +203,17 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+
     def test_getNodeInfo(self):
         """
         Test retrieving node information.
         """
 
         class TestBackend(BaseTestBackend):
-            def get_node_type(self, nodeIdentifier):
+            def getNodeType(self, nodeIdentifier):
                 return defer.succeed('leaf')
 
-            def get_node_meta_data(self, nodeIdentifier):
+            def getNodeMetaData(self, nodeIdentifier):
                 return defer.succeed({'pubsub#persist_items': True})
 
         def cb(info):

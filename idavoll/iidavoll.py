@@ -5,163 +5,185 @@
 Interfaces for idavoll.
 """
 
-from zope.interface import Interface
+from zope.interface import Attribute, Interface
 
 class IBackendService(Interface):
     """ Interface to a backend service of a pubsub service. """
+
 
     def __init__(storage):
         """
         @param storage: L{storage} object.
         """
 
-    def supports_publisher_affiliation():
+
+    def supportsPublisherAffiliation():
         """ Reports if the backend supports the publisher affiliation.
 
         @rtype: C{bool}
         """
 
-    def supports_outcast_affiliation():
+
+    def supportsOutcastAffiliation():
         """ Reports if the backend supports the publisher affiliation.
 
         @rtype: C{bool}
         """
 
-    def supports_persistent_items():
+
+    def supportsPersistentItems():
         """ Reports if the backend supports persistent items.
 
         @rtype: C{bool}
         """
 
-    def get_node_type(node_id):
+
+    def getNodeType(nodeIdentifier):
         """ Return type of a node.
 
         @return: a deferred that returns either 'leaf' or 'collection'
         """
 
-    def get_nodes():
+
+    def getNodes():
         """ Returns list of all nodes.
 
         @return: a deferred that returns a C{list} of node ids.
         """
 
-    def get_node_meta_data(node_id):
+
+    def getNodeMetaData(nodeIdentifier):
         """ Return meta data for a node.
 
         @return: a deferred that returns a C{list} of C{dict}s with the
                  metadata.
         """
 
-    def create_node(node_id, requestor):
+
+    def createNode(nodeIdentifier, requestor):
         """ Create a node.
 
         @return: a deferred that fires when the node has been created.
         """
 
-    def register_pre_delete(pre_delete_fn):
+
+    def registerPreDelete(preDeleteFn):
         """ Register a callback that is called just before a node deletion.
 
-        The function C{pre_deleted_fn} is added to a list of functions
-        to be called just before deletion of a node. The callback
-        C{pre_delete_fn} is called with the C{node_id} that is about to be
-        deleted and should return a deferred that returns a list of deferreds
-        that are to be fired after deletion. The backend collects the lists
-        from all these callbacks before actually deleting the node in question.
-        After deletion all collected deferreds are fired to do post-processing.
+        The function C{preDeletedFn} is added to a list of functions to be
+        called just before deletion of a node. The callback C{preDeleteFn} is
+        called with the C{nodeIdentifier} that is about to be deleted and
+        should return a deferred that returns a list of deferreds that are to
+        be fired after deletion. The backend collects the lists from all these
+        callbacks before actually deleting the node in question.  After
+        deletion all collected deferreds are fired to do post-processing.
 
-        The idea is that you want to be able to collect data from the
-        node before deleting it, for example to get a list of subscribers
-        that have to be notified after the node has been deleted. To do this,
-        C{pre_delete_fn} fetches the subscriber list and passes this
-        list to a callback attached to a deferred that it sets up. This
-        deferred is returned in the list of deferreds.
+        The idea is that you want to be able to collect data from the node
+        before deleting it, for example to get a list of subscribers that have
+        to be notified after the node has been deleted. To do this,
+        C{preDeleteFn} fetches the subscriber list and passes this list to a
+        callback attached to a deferred that it sets up. This deferred is
+        returned in the list of deferreds.
         """
 
-    def delete_node(node_id, requestor):
+
+    def deleteNode(nodeIdentifier, requestor):
         """ Delete a node.
 
         @return: a deferred that fires when the node has been deleted.
         """
 
-    def purge_node(node_id, requestor):
+
+    def purgeNode(nodeIdentifier, requestor):
         """ Removes all items in node from persistent storage """
 
-    def subscribe(node_id, subscriber, requestor):
+
+    def subscribe(nodeIdentifier, subscriber, requestor):
         """ Request the subscription of an entity to a pubsub node.
 
         Depending on the node's configuration and possible business rules, the
         C{subscriber} is added to the list of subscriptions of the node with id
-        C{node_id}. The C{subscriber} might be different from the C{requestor},
-        and if the C{requestor} is not allowed to subscribe this entity an
-        exception should be raised.
+        C{nodeIdentifier}. The C{subscriber} might be different from the
+        C{requestor}, and if the C{requestor} is not allowed to subscribe this
+        entity an exception should be raised.
 
         @return: a deferred that returns the subscription state
         """
 
-    def unsubscribe(node_id, subscriber, requestor):
+
+    def unsubscribe(nodeIdentifier, subscriber, requestor):
         """ Cancel the subscription of an entity to a pubsub node.
 
         The subscription of C{subscriber} is removed from the list of
-        subscriptions of the node with id C{node_id}. If the C{requestor}
-        is not allowed to unsubscribe C{subscriber}, an an exception should
-        be raised.
+        subscriptions of the node with id C{nodeIdentifier}. If the
+        C{requestor} is not allowed to unsubscribe C{subscriber}, an an
+        exception should be raised.
 
         @return: a deferred that fires when unsubscription is complete.
         """
 
-    def get_subscribers(node_id):
+
+    def getSubscribers(nodeIdentifier):
         """ Get node subscriber list.
 
         @return: a deferred that fires with the list of subscribers.
         """
 
-    def get_subscriptions(entity):
+
+    def getSubscriptions(entity):
         """ Report the list of current subscriptions with this pubsub service.
 
         Report the list of the current subscriptions with all nodes within this
         pubsub service, for the C{entity}.
 
         @return: a deferred that returns the list of all current subscriptions
-                 as tuples C{(node_id, subscriber, subscription)}.
+                 as tuples C{(nodeIdentifier, subscriber, subscription)}.
         """
 
-    def get_affiliations(entity):
+
+    def getAffiliations(entity):
         """ Report the list of current affiliations with this pubsub service.
 
         Report the list of the current affiliations with all nodes within this
         pubsub service, for the C{entity}.
 
         @return: a deferred that returns the list of all current affiliations
-                 as tuples C{(node_id, affiliation)}.
+                 as tuples C{(nodeIdentifier, affiliation)}.
         """
 
-    def publish(node_id, items, requestor):
+
+    def publish(nodeIdentifier, items, requestor):
         """ Publish items to a pubsub node.
 
         @return: a deferred that fires when the items have been published.
         @rtype: L{Deferred<twisted.internet.defer.Deferred>}
         """
 
-    def register_notifier(observerfn, *args, **kwargs):
+
+    def registerNotifier(observerfn, *args, **kwargs):
         """ Register callback which is called for notification. """
 
-    def get_notification_list(node_id, items):
+
+    def getNotificationList(nodeIdentifier, items):
         """
         Get list of entities to notify.
         """
 
-    def get_items(node_id, requestor, max_items=None, item_ids=[]):
+
+    def getItems(nodeIdentifier, requestor, maxItems=None, itemIdentifiers=[]):
         """ Retrieve items from persistent storage
 
-        If C{max_items} is given, return the C{max_items} last published
-        items, else if C{item_ids} is not empty, return the items requested.
-        If neither is given, return all items.
+        If C{maxItems} is given, return the C{maxItems} last published
+        items, else if C{itemIdentifiers} is not empty, return the items
+        requested.  If neither is given, return all items.
 
         @return: a deferred that returns the requested items
         """
 
-    def retract_item(node_id, item_id, requestor):
+
+    def retractItem(nodeIdentifier, itemIdentifier, requestor):
         """ Removes item in node from persistent storage """
+
 
 
 class IStorage(Interface):
@@ -169,47 +191,52 @@ class IStorage(Interface):
     Storage interface.
     """
 
-    def get_node(node_id):
+
+    def getNode(nodeIdentifier):
         """
         Get Node.
 
-        @param node_id: NodeID of the desired node.
-        @type node_id: L{str}
+        @param nodeIdentifier: NodeID of the desired node.
+        @type nodeIdentifier: L{str}
         @return: deferred that returns a L{Node} object.
         """
 
-    def get_node_ids():
+
+    def getNodeIds():
         """
         Return all NodeIDs.
 
         @return: deferred that returns a list of NodeIDs (L{str}).
         """
 
-    def create_node(node_id, owner, config=None):
+
+    def createNode(nodeIdentifier, owner, config=None):
         """
         Create new node.
 
         The implementation should make sure, the passed owner JID is stripped
         of the resource (e.g. using C{owner.userhostJID()}).
 
-        @param node_id: NodeID of the new node.
-        @type node_id: L{str}
+        @param nodeIdentifier: NodeID of the new node.
+        @type nodeIdentifier: L{str}
         @param owner: JID of the new nodes's owner.
         @type owner: L{jid.JID}
         @param config: Configuration
         @return: deferred that fires on creation.
         """
 
-    def delete_node(node_id):
+
+    def deleteNode(nodeIdentifier):
         """
         Delete a node.
 
-        @param node_id: NodeID of the new node.
-        @type node_id: L{str}
+        @param nodeIdentifier: NodeID of the new node.
+        @type nodeIdentifier: L{str}
         @return: deferred that fires on deletion.
         """
 
-    def get_affiliations(entity):
+
+    def getAffiliations(entity):
         """
         Get all affiliations for entity.
 
@@ -219,12 +246,13 @@ class IStorage(Interface):
         @param entity: JID of the entity.
         @type entity: L{jid.JID}
         @return: deferred that returns a L{list} of tuples of the form
-                 C{(node_id, affiliation)}, where C{node_id} is of the type
-                 L{str} and C{affiliation} is one of C{'owner'}, C{'publisher'}
-                 and C{'outcast'}.
+                 C{(nodeIdentifier, affiliation)}, where C{nodeIdentifier} is
+                 of the type L{str} and C{affiliation} is one of C{'owner'},
+                 C{'publisher'} and C{'outcast'}.
         """
 
-    def get_subscriptions(entity):
+
+    def getSubscriptions(entity):
         """
         Get all subscriptions for an entity.
 
@@ -234,10 +262,12 @@ class IStorage(Interface):
         @param entity: JID of the entity.
         @type entity: L{jid.JID}
         @return: deferred that returns a L{list} of tuples of the form
-                 C{(node_id, subscriber, state)}, where C{node_id} is of the
-                 type L{str}, C{subscriber} of the type {jid.JID}, and
-                 C{state} is C{'subscribed'} or C{'pending'}.
+                 C{(nodeIdentifier, subscriber, state)}, where
+                 C{nodeIdentifier} is of the type L{str}, C{subscriber} of the
+                 type {jid.JID}, and C{state} is C{'subscribed'} or
+                 C{'pending'}.
         """
+
 
 
 class INode(Interface):
@@ -245,14 +275,20 @@ class INode(Interface):
     Interface to the class of objects that represent nodes.
     """
 
-    def get_type():
+    nodeType = Attribute("""The type of this node. One of {'leaf'},
+                           {'collection'}.""")
+    nodeIdentifier = Attribute("""The node identifer of this node""")
+
+
+    def getType():
         """
         Get node's type.
 
         @return: C{'leaf'} or C{'collection'}.
         """
 
-    def get_configuration():
+
+    def getConfiguration():
         """
         Get node's configuration.
 
@@ -262,7 +298,8 @@ class INode(Interface):
         @return: L{dict} of configuration options.
         """
 
-    def get_meta_data():
+
+    def getMetaData():
         """
         Get node's meta data.
 
@@ -272,7 +309,8 @@ class INode(Interface):
         @return: L{dict} of meta data.
         """
 
-    def set_configuration(options):
+
+    def setConfiguration(options):
         """
         Set node's configuration.
 
@@ -284,7 +322,8 @@ class INode(Interface):
         @returns: a deferred that fires upon success.
         """
 
-    def get_affiliation(entity):
+
+    def getAffiliation(entity):
         """
         Get affiliation of entity with this node.
 
@@ -294,7 +333,8 @@ class INode(Interface):
                  or C{None}.
         """
 
-    def get_subscription(subscriber):
+
+    def getSubscription(subscriber):
         """
         Get subscription to this node of subscriber.
 
@@ -304,7 +344,8 @@ class INode(Interface):
                  C{'pending'} or C{None}).
         """
 
-    def add_subscription(subscriber, state):
+
+    def addSubscription(subscriber, state):
         """
         Add new subscription to this node with given state.
 
@@ -315,7 +356,8 @@ class INode(Interface):
         @return: deferred that fires on subscription.
         """
 
-    def remove_subscription(subscriber):
+
+    def removeSubscription(subscriber):
         """
         Remove subscription to this node.
 
@@ -324,7 +366,8 @@ class INode(Interface):
         @return: deferred that fires on removal.
         """
 
-    def get_subscribers():
+
+    def getSubscribers():
         """
         Get list of subscribers to this node.
 
@@ -334,7 +377,8 @@ class INode(Interface):
         @return: a deferred that returns a L{list} of L{jid.JID}s.
         """
 
-    def is_subscribed(entity):
+
+    def isSubscribed(entity):
         """
         Returns whether entity has any subscription to this node.
 
@@ -346,7 +390,8 @@ class INode(Interface):
         @return: deferred that returns a L{bool}.
         """
 
-    def get_affiliations():
+
+    def getAffiliations():
         """
         Get affiliations of entities with this node.
 
@@ -355,12 +400,14 @@ class INode(Interface):
         C{'publisher'}, C{'outcast'}.
         """
 
+
+
 class ILeafNode(Interface):
     """
     Interface to the class of objects that represent leaf nodes.
     """
 
-    def store_items(items, publisher):
+    def storeItems(items, publisher):
         """
         Store items in persistent storage for later retrieval.
 
@@ -374,30 +421,33 @@ class ILeafNode(Interface):
         @return: deferred that fires upon success.
         """
 
-    def remove_items(item_ids):
+
+    def removeItems(itemIdentifiers):
         """
         Remove items by id.
 
-        @param item_ids: L{list} of item ids.
+        @param itemIdentifiers: L{list} of item ids.
         @return: deferred that fires with a L{list} of ids of the items that
                  were deleted
         """
 
-    def get_items(max_items=None):
+
+    def getItems(maxItems=None):
         """
         Get items.
 
-        If C{max_items} is not given, all items in the node are returned,
-        just like C{get_items_by_id}. Otherwise, C{max_items} limits
+        If C{maxItems} is not given, all items in the node are returned,
+        just like C{getItemsById}. Otherwise, C{maxItems} limits
         the returned items to a maximum of that number of most recently
         published items.
 
-        @param max_items: if given, a natural number (>0) that limits the
+        @param maxItems: if given, a natural number (>0) that limits the
                           returned number of items.
         @return: deferred that fires with a L{list} of found items.
         """
 
-    def get_items_by_id(item_ids):
+
+    def getItemsById(itemIdentifiers):
         """
         Get items by item id.
 
@@ -405,9 +455,10 @@ class ILeafNode(Interface):
         represent the XML of the item as it was published, including the
         item wrapper with item id.
 
-        @param item_ids: L{list} of item ids.
+        @param itemIdentifiers: L{list} of item ids.
         @return: deferred that fires with a L{list} of found items.
         """
+
 
     def purge():
         """
