@@ -8,7 +8,7 @@ Generic publish-subscribe backend.
 
 This module implements a generic publish-subscribe backend service with
 business logic as per
-L{XEP-0060<http://www.xmpp.org/extensions/xep-0060.html>)} that interacts with
+U{XEP-0060<http://www.xmpp.org/extensions/xep-0060.html>} that interacts with
 a given storage facility. It also provides an adapter from the XMPP
 publish-subscribe protocol.
 """
