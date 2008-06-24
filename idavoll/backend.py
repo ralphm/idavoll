@@ -147,6 +147,8 @@ class BackendService(service.Service, utility.EventDispatcher):
 
         if persistItems or deliverPayloads:
             for item in items:
+                item.uri = None
+                item.defaultUri = None
                 if not item.getAttribute("id"):
                     item["id"] = str(uuid.uuid4())
 
