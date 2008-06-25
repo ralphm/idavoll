@@ -147,8 +147,6 @@ class BackendService(service.Service, utility.EventDispatcher):
 
         if persistItems or deliverPayloads:
             for item in items:
-                item.uri = None
-                item.defaultUri = None
                 if not item.getAttribute("id"):
                     item["id"] = str(uuid.uuid4())
 
@@ -224,31 +222,10 @@ class BackendService(service.Service, utility.EventDispatcher):
 
 
     def _sendLastPublished(self, node, subscriber):
-        class StringParser(object):
-            def __init__(self):
-                self.elementStream = domish.elementStream()
-                self.elementStream.DocumentStartEvent = self.docStart
-                self.elementStream.ElementEvent = self.elem
-                self.elementStream.DocumentEndEvent = self.docEnd
 
-            def docStart(self, elem):
-                self.document = elem
-
-            def elem(self, elem):
-                self.document.addChild(elem)
-
-            def docEnd(self):
-                pass
-
-            def parse(self, string):
-                self.elementStream.parse(string)
-                return self.document
-
-        def notifyItem(result):
-            if not result:
+        def notifyItem(items):
+            if not items:
                 return
-
-            items = [domish.SerializedXML(item) for item in result]
 
             reactor.callLater(0, self.dispatch,
                                  {'items': items,

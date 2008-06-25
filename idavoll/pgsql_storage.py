@@ -2,9 +2,13 @@
 # See LICENSE for details.
 
 import copy
+
+from zope.interface import implements
+
 from twisted.enterprise import adbapi
 from twisted.words.protocols.jabber import jid
-from zope.interface import implements
+
+from wokkel.generic import parseXml
 
 from idavoll import error, iidavoll
 
@@ -418,7 +422,7 @@ class LeafNodeMixin:
             cursor.execute(query, (self.nodeIdentifier))
 
         result = cursor.fetchall()
-        return [unicode(r[0], 'utf-8') for r in result]
+        return [parseXml(r[0]) for r in result]
 
 
     def getItemsById(self, itemIdentifiers):
@@ -436,7 +440,7 @@ class LeafNodeMixin:
                             itemIdentifier))
             result = cursor.fetchone()
             if result:
-                items.append(unicode(result[0], 'utf-8'))
+                items.append(parseXml(result[0]))
         return items
 
 

@@ -261,7 +261,7 @@ class StorageTests:
             return self.node.getItemsById(['new'])
 
         def cb2(result):
-            self.assertEqual(result[0], decode(ITEM_NEW.toXml()))
+            self.assertEqual(ITEM_NEW.toXml(), result[0].toXml())
 
         d = self.node.storeItems([ITEM_NEW], PUBLISHER)
         d.addCallback(cb1)
@@ -274,7 +274,7 @@ class StorageTests:
             return self.node.getItemsById(['current'])
 
         def cb2(result):
-            self.assertEqual(result[0], decode(ITEM_UPDATED.toXml()))
+            self.assertEqual(ITEM_UPDATED.toXml(), result[0].toXml())
 
         d = self.node.storeItems([ITEM_UPDATED], PUBLISHER)
         d.addCallback(cb1)
@@ -284,11 +284,11 @@ class StorageTests:
 
     def test_removeItems(self):
         def cb1(result):
-            self.assertEqual(result, ['to-be-deleted'])
+            self.assertEqual(['to-be-deleted'], result)
             return self.node.getItemsById(['to-be-deleted'])
 
         def cb2(result):
-            self.assertEqual(len(result), 0)
+            self.assertEqual(0, len(result))
 
         d = self.node.removeItems(['to-be-deleted'])
         d.addCallback(cb1)
@@ -298,7 +298,7 @@ class StorageTests:
 
     def test_removeNonExistingItems(self):
         def cb(result):
-            self.assertEqual(result, [])
+            self.assertEqual([], result)
 
         d = self.node.removeItems(['non-existing'])
         d.addCallback(cb)
@@ -307,7 +307,8 @@ class StorageTests:
 
     def test_getItems(self):
         def cb(result):
-            self.assertIn(decode(ITEM.toXml()), result)
+            items = [item.toXml() for item in result]
+            self.assertIn(ITEM.toXml(), items)
 
         d = self.node.getItems()
         d.addCallback(cb)
@@ -316,7 +317,8 @@ class StorageTests:
 
     def test_lastItem(self):
         def cb(result):
-            self.assertEqual([decode(ITEM.toXml())], result)
+            self.assertEqual(1, len(result))
+            self.assertEqual(ITEM.toXml(), result[0].toXml())
 
         d = self.node.getItems(1)
         d.addCallback(cb)
@@ -325,7 +327,7 @@ class StorageTests:
 
     def test_getItemsById(self):
         def cb(result):
-            self.assertEqual(len(result), 1)
+            self.assertEqual(1, len(result))
 
         d = self.node.getItemsById(['current'])
         d.addCallback(cb)
@@ -334,7 +336,7 @@ class StorageTests:
 
     def test_getNonExistingItemsById(self):
         def cb(result):
-            self.assertEqual(len(result), 0)
+            self.assertEqual(0, len(result))
 
         d = self.node.getItemsById(['non-existing'])
         d.addCallback(cb)
@@ -378,8 +380,9 @@ class StorageTests:
 class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
     def setUp(self):
-        from idavoll.memory_storage import Storage, LeafNode, Subscription, \
-                                           defaultConfig
+        from idavoll.memory_storage import Storage, PublishedItem, LeafNode
+        from idavoll.memory_storage import Subscription, defaultConfig
+
         self.s = Storage()
         self.s._nodes['pre-existing'] = \
                 LeafNode('pre-existing', OWNER, defaultConfig)
@@ -397,12 +400,12 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
         subscriptions[SUBSCRIBER_PENDING.full()] = \
                 Subscription('pending')
 
-        item = (decode(ITEM_TO_BE_DELETED.toXml()), PUBLISHER)
+        item = PublishedItem(ITEM_TO_BE_DELETED, PUBLISHER)
         self.s._nodes['pre-existing']._items['to-be-deleted'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
         self.s._nodes['to-be-purged']._items['to-be-deleted'] = item
         self.s._nodes['to-be-purged']._itemlist.append(item)
-        item = (decode(ITEM.toXml()), PUBLISHER)
+        item = PublishedItem(ITEM, PUBLISHER)
         self.s._nodes['pre-existing']._items['current'] = item
         self.s._nodes['pre-existing']._itemlist.append(item)
 

@@ -169,6 +169,24 @@ class Node:
 
 
 
+class PublishedItem(object):
+    """
+    A published item.
+
+    This represent an item as it was published by an entity.
+
+    @ivar element: The DOM representation of the item that was published.
+    @type element: L{Element<twisted.words.xish.domish.Element>}
+    @ivar publisher: The entity that published the item.
+    @type publisher: L{JID<twisted.words.protocols.jabber.jid.JID>}
+    """
+
+    def __init__(self, element, publisher):
+        self.element = element
+        self.publisher = publisher
+
+
+
 class LeafNodeMixin:
 
     nodeType = 'leaf'
@@ -179,12 +197,9 @@ class LeafNodeMixin:
 
 
     def storeItems(self, items, publisher):
-        for data in items:
-            itemIdentifier = data["id"]
-            data = data.toXml()
-            if isinstance(data, str):
-                data = data.decode('utf-8')
-            item = (data, publisher)
+        for element in items:
+            item = PublishedItem(element, publisher)
+            itemIdentifier = element["id"]
             if itemIdentifier in self._items:
                 self._itemlist.remove(self._items[itemIdentifier])
             self._items[itemIdentifier] = item
@@ -211,10 +226,10 @@ class LeafNodeMixin:
 
     def getItems(self, maxItems=None):
         if maxItems:
-            list = self._itemlist[-maxItems:]
+            itemList = self._itemlist[-maxItems:]
         else:
-            list = self._itemlist
-        return defer.succeed([item[0] for item in list])
+            itemList = self._itemlist
+        return defer.succeed([item.element for item in itemList])
 
 
     def getItemsById(self, itemIdentifiers):
@@ -225,7 +240,7 @@ class LeafNodeMixin:
             except KeyError:
                 pass
             else:
-                items.append(item[0])
+                items.append(item.element)
         return defer.succeed(items)
 
 
