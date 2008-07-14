@@ -411,12 +411,12 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         return defer.succeed(None)
 
 
-    def itemsReceived(self, recipient, service, nodeIdentifier, items):
+    def itemsReceived(self, event):
         """
         Fire up HTTP client to do callback
         """
 
-        atomEntries = extractAtomEntries(items)
+        atomEntries = extractAtomEntries(event.items)
 
         # Don't notify if there are no atom entries
         if not atomEntries:
@@ -427,18 +427,21 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
             payload = atomEntries[0]
         else:
             contentType = 'application/atom+xml;type=feed'
-            payload = constructFeed(service, nodeIdentifier, atomEntries,
+            payload = constructFeed(event.sender, event.nodeIdentifier,
+                                    atomEntries,
                                     title='Received item collection')
 
-        self.callCallbacks(service, nodeIdentifier, payload, contentType)
+        self.callCallbacks(event.sender, event.nodeIdentifier, payload,
+                           contentType)
 
 
-    def deleteReceived(self, recipient, service, nodeIdentifier):
+    def deleteReceived(self, event):
         """
         Fire up HTTP client to do callback
         """
 
-        self.callCallbacks(service, nodeIdentifier, eventType='DELETED')
+        self.callCallbacks(event.sender, event.nodeIdentifier,
+                           eventType='DELETED')
 
 
     def _postTo(self, callbacks, service, nodeIdentifier,
