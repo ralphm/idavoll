@@ -36,7 +36,14 @@ def makeService(config):
 
     # Set up XMPP service for subscribing to remote nodes
 
-    ss = RemoteSubscriptionService(config['jid'])
+    if config['backend'] == 'pgsql':
+        from idavoll.pgsql_storage import GatewayStorage
+        gst = GatewayStorage(bs.storage.dbpool)
+    elif config['backend'] == 'memory':
+        from idavoll.memory_storage import GatewayStorage
+        gst = GatewayStorage()
+
+    ss = RemoteSubscriptionService(config['jid'], gst)
     ss.setHandlerParent(cs)
     ss.startService()
 

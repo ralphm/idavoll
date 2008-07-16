@@ -35,7 +35,7 @@ class GatewayTest(unittest.TestCase):
         self.client.startService()
 
     def tearDown(self):
-        self.client.stopService()
+        return self.client.stopService()
 
     def test_create(self):
 
@@ -93,6 +93,7 @@ class GatewayTest(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+
     def test_subscribeGetNotification(self):
 
         def onNotification(data, headers):
@@ -115,6 +116,50 @@ class GatewayTest(unittest.TestCase):
         d.addCallback(cb)
         d.addCallback(cb2)
         return defer.gatherResults([d, self.client.deferred])
+
+
+    def test_subscribeTwiceGetNotification(self):
+
+        def onNotification1(data, headers):
+            d = client1.stopService()
+            d.chainDeferred(client1.deferred)
+
+        def onNotification2(data, headers):
+            d = client2.stopService()
+            d.chainDeferred(client2.deferred)
+
+        def cb(response):
+            xmppURI = response['uri']
+            d = client1.subscribe(xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb2(xmppURI):
+            d = client2.subscribe(xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb3(xmppURI):
+            d = self.client.publish(entry, xmppURI)
+            return d
+
+
+        client1 = gateway.GatewayClient(baseURI, callbackPort=8088)
+        client1.startService()
+        client1.callback = onNotification1
+        client1.deferred = defer.Deferred()
+        client2 = gateway.GatewayClient(baseURI, callbackPort=8089)
+        client2.startService()
+        client2.callback = onNotification2
+        client2.deferred = defer.Deferred()
+
+        d = self.client.create()
+        d.addCallback(cb)
+        d.addCallback(cb2)
+        d.addCallback(cb3)
+        dl = defer.gatherResults([d, client1.deferred, client2.deferred])
+        return dl
+
 
     def test_subscribeGetDelayedNotification(self):
 
@@ -178,7 +223,6 @@ class GatewayTest(unittest.TestCase):
         client2.startService()
         client2.callback = onNotification2
         client2.deferred = defer.Deferred()
-
 
         d = self.client.create()
         d.addCallback(cb)

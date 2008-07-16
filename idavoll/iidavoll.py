@@ -466,3 +466,66 @@ class ILeafNode(Interface):
 
         @return: deferred that fires when the node has been purged.
         """
+
+
+
+class IGatewayStorage(Interface):
+
+    def addCallback(service, nodeIdentifier, callback):
+        """
+        Register a callback URI.
+
+        The registered HTTP callback URI will have an Atom Entry documented
+        POSTed to it upon receiving a notification for the given pubsub node.
+
+        @param service: The XMPP entity that holds the node.
+        @type service: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @param nodeIdentifier: The identifier of the publish-subscribe node.
+        @type nodeIdentifier: C{unicode}.
+        @param callback: The callback URI to be registered.
+        @type callback: C{str}.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
+        """
+
+    def removeCallback(service, nodeIdentifier, callback):
+        """
+        Remove a registered callback URI.
+
+        The returned deferred will fire with a boolean that signals wether or
+        not this was the last callback unregistered for this node.
+
+        @param service: The XMPP entity that holds the node.
+        @type service: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @param nodeIdentifier: The identifier of the publish-subscribe node.
+        @type nodeIdentifier: C{unicode}.
+        @param callback: The callback URI to be unregistered.
+        @type callback: C{str}.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
+        """
+
+    def getCallbacks(service, nodeIdentifier):
+        """
+        Get the callbacks registered for this node.
+
+        Returns a deferred that fires with the set of HTTP callback URIs
+        registered for this node.
+
+        @param service: The XMPP entity that holds the node.
+        @type service: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @param nodeIdentifier: The identifier of the publish-subscribe node.
+        @type nodeIdentifier: C{unicode}.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
+        """
+
+
+    def hasCallbacks(service, nodeIdentifier):
+        """
+        Return wether there are callbacks registered for a node.
+
+        @param service: The XMPP entity that holds the node.
+        @type service: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @param nodeIdentifier: The identifier of the publish-subscribe node.
+        @type nodeIdentifier: C{unicode}.
+        @returns: Deferred that fires with a boolean.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
+        """

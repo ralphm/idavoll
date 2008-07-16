@@ -16,14 +16,19 @@ class NodeExists(Error):
     pass
 
 
+
 class NotSubscribed(Error):
     """
     Entity is not subscribed to this node.
     """
 
 
+
 class SubscriptionExists(Error):
-    pass
+    """
+    There already exists a subscription to this node.
+    """
+
 
 
 class Forbidden(Error):
@@ -56,3 +61,10 @@ class NodeNotPersistent(Error):
 
 class NoRootNode(Error):
     pass
+
+
+
+class NoCallbacks(Error):
+    """
+    There are no callbacks for this node.
+    """

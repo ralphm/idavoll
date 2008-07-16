@@ -414,22 +414,24 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
 
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
-    def _callSuperSetUp(self, void):
-        return StorageTests.setUp(self)
-
 
     def setUp(self):
         from idavoll.pgsql_storage import Storage
-        self.s = Storage('ralphm', 'pubsub_test')
-        self.s._dbpool.start()
-        d = self.s._dbpool.runInteraction(self.init)
-        d.addCallback(self._callSuperSetUp)
+        from twisted.enterprise import adbapi
+        self.dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+                                            database='pubsub_test',
+                                            cp_reconnect=True,
+                                            client_encoding='utf-8',
+                                            )
+        self.s = Storage(self.dbpool)
+        self.dbpool.start()
+        d = self.dbpool.runInteraction(self.init)
+        d.addCallback(lambda _: StorageTests.setUp(self))
         return d
 
 
-    def tearDownClass(self):
-        #return self.s._dbpool.runInteraction(self.cleandb)
-        pass
+    def tearDown(self):
+        return self.dbpool.runInteraction(self.cleandb)
 
 
     def init(self, cursor):

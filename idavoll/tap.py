@@ -45,12 +45,18 @@ def makeService(config):
     # Create backend service with storage
 
     if config['backend'] == 'pgsql':
+        from twisted.enterprise import adbapi
         from idavoll.pgsql_storage import Storage
-        st = Storage(user=config['dbuser'],
-                     database=config['dbname'],
-                     password=config['dbpass'],
-                     host=config['dbhost'],
-                     port=config['dbport'])
+        dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+                                       user=config['dbuser'],
+                                       password=config['dbuser'],
+                                       database=config['dbname'],
+                                       host=config['dbpass'],
+                                       port=config['dbport'],
+                                       cp_reconnect=True,
+                                       client_encoding='utf-8',
+                                       )
+        st = Storage(dbpool)
     elif config['backend'] == 'memory':
         from idavoll.memory_storage import Storage
         st = Storage()

@@ -266,3 +266,53 @@ class Subscription:
 
     def __init__(self, state):
         self.state = state
+
+
+
+class GatewayStorage(object):
+    """
+    Memory based storage facility for the XMPP-HTTP gateway.
+    """
+
+    def __init__(self):
+        self.callbacks = {}
+
+
+    def addCallback(self, service, nodeIdentifier, callback):
+        try:
+            callbacks = self.callbacks[service, nodeIdentifier]
+        except KeyError:
+            callbacks = set([callback])
+            self.callbacks[service, nodeIdentifier] = callbacks
+        else:
+            callbacks.add(callback)
+            pass
+
+        print self.callbacks
+        return defer.succeed(None)
+
+
+    def removeCallback(self, service, nodeIdentifier, callback):
+        try:
+            callbacks = self.callbacks[service, nodeIdentifier]
+            callbacks.remove(callback)
+        except KeyError:
+            return defer.fail(error.NotSubscribed())
+        else:
+            if not callbacks:
+                del self.callbacks[service, nodeIdentifier]
+
+            return defer.succeed(not callbacks)
+
+
+    def getCallbacks(self, service, nodeIdentifier):
+        try:
+            callbacks = self.callbacks[service, nodeIdentifier]
+        except KeyError:
+            return defer.fail(error.NoCallbacks())
+        else:
+            return defer.succeed(callbacks)
+
+
+    def hasCallbacks(self, service, nodeIdentifier):
+        return defer.succeed((service, nodeIdentifier) in self.callbacks)
