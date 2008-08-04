@@ -268,7 +268,6 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def getDefaultConfiguration(self):
         d = defer.succeed(self.defaultConfig)
-        d.addCallback(self._makeConfig)
         return d
 
 
@@ -278,35 +277,12 @@ class BackendService(service.Service, utility.EventDispatcher):
 
         d = self.storage.getNode(nodeIdentifier)
         d.addCallback(lambda node: node.getConfiguration())
-
-        d.addCallback(self._makeConfig)
         return d
-
-
-    def _makeConfig(self, config):
-        options = []
-        for key, value in self.options.iteritems():
-            option = {"var": key}
-            option.update(value)
-            if config.has_key(key):
-                option["value"] = config[key]
-            options.append(option)
-
-        return options
 
 
     def setNodeConfiguration(self, nodeIdentifier, options, requestor):
         if not nodeIdentifier:
             return defer.fail(error.NoRootNode())
-
-        for key, value in options.iteritems():
-            if not self.options.has_key(key):
-                return defer.fail(error.InvalidConfigurationOption())
-            if self.options[key]["type"] == 'boolean':
-                try:
-                    options[key] = bool(int(value))
-                except ValueError:
-                    return defer.fail(error.InvalidConfigurationValue())
 
         d = self.storage.getNode(nodeIdentifier)
         d.addCallback(_getAffiliation, requestor)
@@ -607,6 +583,10 @@ class PubSubServiceFromBackend(PubSubService):
     def create(self, requestor, service, nodeIdentifier):
         d = self.backend.createNode(nodeIdentifier, requestor)
         return d.addErrback(self._mapErrors)
+
+
+    def getConfigurationOptions(self):
+        return self.backend.options
 
 
     def getDefaultConfiguration(self, requestor, service):

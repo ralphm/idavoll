@@ -79,6 +79,87 @@ class BackendTest(unittest.TestCase):
         return d
 
 
+    def test_getDefaultConfiguration(self):
+        """
+        L{backend.BackendService.getDefaultConfiguration} should return
+        a deferred that fires a dictionary with configuration values.
+        """
+
+        def cb(options):
+            self.assertIn("pubsub#persist_items", options)
+            self.assertEqual(True, options["pubsub#persist_items"])
+
+        self.backend = backend.BackendService(None)
+        d = self.backend.getDefaultConfiguration()
+        d.addCallback(cb)
+        return d
+
+
+    def test_getNodeConfiguration(self):
+        class testNode:
+            nodeIdentifier = 'node'
+            def getConfiguration(self):
+                return {'pubsub#deliver_payloads': True,
+                        'pubsub#persist_items': False}
+
+        class testStorage:
+            def getNode(self, nodeIdentifier):
+                return defer.succeed(testNode())
+
+        def cb(options):
+            self.assertIn("pubsub#deliver_payloads", options)
+            self.assertEqual(True, options["pubsub#deliver_payloads"])
+            self.assertIn("pubsub#persist_items", options)
+            self.assertEqual(False, options["pubsub#persist_items"])
+
+        self.storage = testStorage()
+        self.backend = backend.BackendService(self.storage)
+        self.storage.backend = self.backend
+
+        d = self.backend.getNodeConfiguration('node')
+        d.addCallback(cb)
+        return d
+
+
+    def test_setNodeConfiguration(self):
+        class testNode:
+            nodeIdentifier = 'node'
+            def getAffiliation(self, entity):
+                if entity is OWNER:
+                    return defer.succeed('owner')
+            def setConfiguration(self, options):
+                self.options = options
+
+        class testStorage:
+            def __init__(self):
+                self.nodes = {'node': testNode()}
+            def getNode(self, nodeIdentifier):
+                return defer.succeed(self.nodes[nodeIdentifier])
+
+        def checkOptions(node):
+            options = node.options
+            self.assertIn("pubsub#deliver_payloads", options)
+            self.assertEqual(True, options["pubsub#deliver_payloads"])
+            self.assertIn("pubsub#persist_items", options)
+            self.assertEqual(False, options["pubsub#persist_items"])
+
+        def cb(result):
+            d = self.storage.getNode('node')
+            d.addCallback(checkOptions)
+            return d
+
+        self.storage = testStorage()
+        self.backend = backend.BackendService(self.storage)
+        self.storage.backend = self.backend
+
+        options = {'pubsub#deliver_payloads': True,
+                   'pubsub#persist_items': False}
+
+        d = self.backend.setNodeConfiguration('node', options, OWNER)
+        d.addCallback(cb)
+        return d
+
+
     def test_publishNoID(self):
         """
         Test publish request with an item without a node identifier.
@@ -224,5 +305,39 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
 
         s = backend.PubSubServiceFromBackend(TestBackend())
         d = s.getNodeInfo(OWNER, 'test.example.org', 'test')
+        d.addCallback(cb)
+        return d
+
+
+    def test_getConfigurationOptions(self):
+        class TestBackend(BaseTestBackend):
+            options = {
+                    "pubsub#persist_items":
+                        {"type": "boolean",
+                         "label": "Persist items to storage"},
+                    "pubsub#deliver_payloads":
+                        {"type": "boolean",
+                         "label": "Deliver payloads with event notifications"}
+            }
+
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        options = s.getConfigurationOptions()
+        self.assertIn("pubsub#persist_items", options)
+
+
+    def test_getDefaultConfiguration(self):
+        class TestBackend(BaseTestBackend):
+            def getDefaultConfiguration(self):
+                options = {"pubsub#persist_items": True,
+                           "pubsub#deliver_payloads": True,
+                           "pubsub#send_last_published_item": 'on_sub',
+                }
+                return defer.succeed(options)
+
+        def cb(options):
+            self.assertEquals(True, options["pubsub#persist_items"])
+
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        d = s.getDefaultConfiguration(OWNER, 'test.example.org')
         d.addCallback(cb)
         return d
