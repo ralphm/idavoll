@@ -1,42 +1,49 @@
-create table entities (
-    id serial primary key,
-    jid text not null unique
+CREATE TABLE entities (
+    entity_id serial PRIMARY KEY,
+    jid text NOT NULL UNIQUE
 );
 
-create table nodes (
-    id serial primary key,
-    node text not null unique,
-    persistent boolean not null default true,
-    deliver_payload boolean not null default true,
-    send_last_published_item text not null default 'on_sub'
-        check (send_last_published_item in ('never', 'on_sub'))
+CREATE TABLE nodes (
+    node_id serial PRIMARY KEY,
+    node text NOT NULL UNIQUE,
+    node_type text NOT NULL DEFAULT 'leaf'
+        CHECK (node_type IN ('leaf', 'collection')),
+    persist_items boolean,
+    deliver_payloads boolean NOT NULL DEFAULT TRUE,
+    send_last_published_item text NOT NULL DEFAULT 'on_sub'
+        CHECK (send_last_published_item IN ('never', 'on_sub'))
 );
 
-create table affiliations (
-    id serial primary key,
-    entity_id integer not null references entities on delete cascade,
-    node_id integer not null references nodes on delete cascade,
-    affiliation text not null
-        check (affiliation in ('outcast', 'publisher', 'owner')),
-    unique (entity_id, node_id)
+INSERT INTO nodes (node, node_type) values ('', 'collection');
+
+CREATE TABLE affiliations (
+    affiliation_id serial PRIMARY KEY,
+    entity_id integer NOT NULL REFERENCES entities ON DELETE CASCADE,
+    node_id integer NOT NULL references nodes ON DELETE CASCADE,
+    affiliation text NOT NULL
+        CHECK (affiliation IN ('outcast', 'publisher', 'owner')),
+    UNIQUE (entity_id, node_id)
 );
 
-create table subscriptions (
-    id serial primary key,
-    entity_id integer not null references entities on delete cascade,
+CREATE TABLE subscriptions (
+    subscription_id serial PRIMARY KEY,
+    entity_id integer NOT NULL REFERENCES entities ON DELETE CASCADE,
     resource text,
-    node_id integer not null references nodes on delete cascade,
-    subscription text not null default 'subscribed' check
-        (subscription in ('subscribed', 'pending', 'unconfigured')),
-    unique (entity_id, resource, node_id)
-);
+    node_id integer NOT NULL REFERENCES nodes ON delete CASCADE,
+    state text NOT NULL DEFAULT 'subscribed'
+    	CHECK (state IN ('subscribed', 'pending', 'unconfigured')),
+    subscription_type text
+    	CHECK (subscription_type IN (NULL, 'items', 'nodes')),
+    subscription_depth text
+    	CHECK (subscription_depth IN (NULL, '1', 'all')),
+    UNIQUE (entity_id, resource, node_id));
 
-create table items (
-    id serial primary key,
-    node_id integer not null references nodes on delete cascade,
-    item text not null,
-    publisher text not null,
+CREATE TABLE items (
+    item_id serial PRIMARY KEY,
+    node_id integer NOT NULL REFERENCES nodes ON DELETE CASCADE,
+    item text NOT NULL,
+    publisher text NOT NULL,
     data text,
-    date timestamp with time zone not null default now(),
-    unique (node_id, item)
+    date timestamp with time zone NOT NULL DEFAULT now(),
+    UNIQUE (node_id, item)
 );

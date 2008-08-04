@@ -6,19 +6,30 @@ from zope.interface import implements
 from twisted.internet import defer
 from twisted.words.protocols.jabber import jid
 
-from idavoll import error, iidavoll
+from wokkel.pubsub import Subscription
 
-defaultConfig = {"pubsub#persist_items": True,
-                  "pubsub#deliver_payloads": True,
-                  "pubsub#send_last_published_item": 'on_sub',
-                  "pubsub#node_type": "leaf"}
+from idavoll import error, iidavoll
 
 class Storage:
 
     implements(iidavoll.IStorage)
 
+    defaultConfig = {
+            'leaf': {
+                "pubsub#persist_items": True,
+                "pubsub#deliver_payloads": True,
+                "pubsub#send_last_published_item": 'on_sub',
+            },
+            'collection': {
+                "pubsub#deliver_payloads": True,
+                "pubsub#send_last_published_item": 'on_sub',
+            }
+    }
+
     def __init__(self):
-        self._nodes = {}
+        rootNode = CollectionNode('', jid.JID('localhost'),
+                                  copy.copy(self.defaultConfig['collection']))
+        self._nodes = {'': rootNode}
 
 
     def getNode(self, nodeIdentifier):
@@ -34,15 +45,12 @@ class Storage:
         return defer.succeed(self._nodes.keys())
 
 
-    def createNode(self, nodeIdentifier, owner, config=None):
+    def createNode(self, nodeIdentifier, owner, config):
         if nodeIdentifier in self._nodes:
             return defer.fail(error.NodeExists())
 
-        if not config:
-            config = copy.copy(defaultConfig)
-
         if config['pubsub#node_type'] != 'leaf':
-            raise NotImplementedError
+            raise error.NoCollections()
 
         node = LeafNode(nodeIdentifier, owner, config)
         self._nodes[nodeIdentifier] = node
@@ -72,11 +80,16 @@ class Storage:
             for subscriber, subscription in node._subscriptions.iteritems():
                 subscriber = jid.internJID(subscriber)
                 if subscriber.userhostJID() == entity.userhostJID():
-                    subscriptions.append((node.nodeIdentifier, subscriber,
-                                          subscription.state))
+                    subscriptions.append(subscription)
 
         return defer.succeed(subscriptions)
 
+
+    def getDefaultConfiguration(self, nodeType):
+        if nodeType == 'collection':
+            raise error.NoCollections()
+
+        return self.defaultConfig[nodeType]
 
 
 class Node:
@@ -120,17 +133,25 @@ class Node:
         try:
             subscription = self._subscriptions[subscriber.full()]
         except KeyError:
-            state = None
+            return defer.succeed(None)
         else:
-            state = subscription.state
-        return defer.succeed(state)
+            return defer.succeed(subscription)
 
 
-    def addSubscription(self, subscriber, state):
+    def getSubscriptions(self, state=None):
+        return defer.succeed(
+                [subscription
+                 for subscription in self._subscriptions.itervalues()
+                 if state is None or subscription.state == state])
+
+
+
+    def addSubscription(self, subscriber, state, options):
         if self._subscriptions.get(subscriber.full()):
             return defer.fail(error.SubscriptionExists())
 
-        subscription = Subscription(state)
+        subscription = Subscription(self.nodeIdentifier, subscriber, state,
+                                    options)
         self._subscriptions[subscriber.full()] = subscription
         return defer.succeed(None)
 
@@ -142,14 +163,6 @@ class Node:
             return defer.fail(error.NotSubscribed())
 
         return defer.succeed(None)
-
-
-    def getSubscribers(self):
-        subscribers = [jid.internJID(subscriber) for subscriber, subscription
-                       in self._subscriptions.iteritems()
-                       if subscription.state == 'subscribed']
-
-        return defer.succeed(subscribers)
 
 
     def isSubscribed(self, entity):
@@ -187,11 +200,14 @@ class PublishedItem(object):
 
 
 
-class LeafNodeMixin:
+class LeafNode(Node):
+
+    implements(iidavoll.ILeafNode)
 
     nodeType = 'leaf'
 
-    def __init__(self):
+    def __init__(self, nodeIdentifier, owner, config):
+        Node.__init__(self, nodeIdentifier, owner, config)
         self._items = {}
         self._itemlist = []
 
@@ -251,21 +267,8 @@ class LeafNodeMixin:
         return defer.succeed(None)
 
 
-
-class LeafNode(Node, LeafNodeMixin):
-
-    implements(iidavoll.ILeafNode)
-
-    def __init__(self, nodeIdentifier, owner, config):
-        Node.__init__(self, nodeIdentifier, owner, config)
-        LeafNodeMixin.__init__(self)
-
-
-
-class Subscription:
-
-    def __init__(self, state):
-        self.state = state
+class CollectionNode(Node):
+    nodeType = 'collection'
 
 
 

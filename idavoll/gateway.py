@@ -66,7 +66,7 @@ def getServiceAndNode(uri):
         raise XMPPURIParseError("Empty URI path component")
 
     try:
-        jid = JID(entity)
+        service = JID(entity)
     except Exception, e:
         raise XMPPURIParseError("Invalid JID: %s" % e.message)
 
@@ -75,9 +75,17 @@ def getServiceAndNode(uri):
     try:
         nodeIdentifier = params['node'][0]
     except (KeyError, ValueError):
-        raise XMPPURIParseError("No node in query component of URI")
+        nodeIdentifier = ''
 
-    return jid, nodeIdentifier
+    return service, nodeIdentifier
+
+
+
+def getXMPPURI(service, nodeIdentifier):
+    """
+    Construct an XMPP URI from a service JID and node identifier.
+    """
+    return "xmpp:%s?;node=%s" % (service.full(), nodeIdentifier or '')
 
 
 
@@ -134,10 +142,11 @@ class CreateResource(resource.Resource):
         """
 
         def toResponse(nodeIdentifier):
-            uri = 'xmpp:%s?;node=%s' % (self.serviceJID.full(), nodeIdentifier)
+            uri = getXMPPURI(self.serviceJID, nodeIdentifier)
             stream = simplejson.dumps({'uri': uri})
-            return http.Response(responsecode.OK, stream=stream)
-
+            contentType = http_headers.MimeType.fromString(MIME_JSON)
+            return http.Response(responsecode.OK, stream=stream,
+                                 headers={'Content-Type': contentType})
         d = self.backend.createNode(None, self.owner)
         d.addCallback(toResponse)
         return d
@@ -237,9 +246,11 @@ class PublishResource(resource.Resource):
         """
 
         def toResponse(nodeIdentifier):
-            uri = 'xmpp:%s?;node=%s' % (self.serviceJID.full(), nodeIdentifier)
+            uri = getXMPPURI(self.serviceJID, nodeIdentifier)
             stream = simplejson.dumps({'uri': uri})
-            return http.Response(responsecode.OK, stream=stream)
+            contentType = http_headers.MimeType.fromString(MIME_JSON)
+            return http.Response(responsecode.OK, stream=stream,
+                                 headers={'Content-Type': contentType})
 
         def gotNode(nodeIdentifier, payload):
             item = Item(id='current', payload=payload)
@@ -286,8 +297,10 @@ class ListResource(resource.Resource):
 
     def render(self, request):
         def responseFromNodes(nodeIdentifiers):
-            return http.Response(responsecode.OK,
-                                 stream=simplejson.dumps(nodeIdentifiers))
+            stream = simplejson.dumps(nodeIdentifiers)
+            contentType = http_headers.MimeType.fromString(MIME_JSON)
+            return http.Response(responsecode.OK, stream=stream,
+                                 headers={'Content-Type': contentType})
 
         d = self.service.getNodes()
         d.addCallback(responseFromNodes)
@@ -328,7 +341,7 @@ def extractAtomEntries(items):
 
 
 def constructFeed(service, nodeIdentifier, entries, title):
-    nodeURI = 'xmpp:%s?;node=%s' % (service.full(), nodeIdentifier)
+    nodeURI = getXMPPURI(service, nodeIdentifier)
     now = strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
 
     # Collect the received entries in a feed
@@ -428,6 +441,9 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         """
 
         atomEntries = extractAtomEntries(event.items)
+        service = event.sender
+        nodeIdentifier = event.nodeIdentifier
+        headers = event.headers
 
         # Don't notify if there are no atom entries
         if not atomEntries:
@@ -438,12 +454,16 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
             payload = atomEntries[0]
         else:
             contentType = 'application/atom+xml;type=feed'
-            payload = constructFeed(event.sender, event.nodeIdentifier,
-                                    atomEntries,
+            payload = constructFeed(service, nodeIdentifier, atomEntries,
                                     title='Received item collection')
 
-        self.callCallbacks(event.sender, event.nodeIdentifier, payload,
-                           contentType)
+        self.callCallbacks(service, nodeIdentifier, payload, contentType)
+
+        if 'Collection' in headers:
+            for collection in headers['Collection']:
+                nodeIdentifier = collection or ''
+                self.callCallbacks(service, nodeIdentifier, payload,
+                                   contentType)
 
 
     def deleteReceived(self, event):
@@ -451,8 +471,9 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         Fire up HTTP client to do callback
         """
 
-        self.callCallbacks(event.sender, event.nodeIdentifier,
-                           eventType='DELETED')
+        service = event.sender
+        nodeIdentifier = event.nodeIdentifier
+        self.callCallbacks(service, nodeIdentifier, eventType='DELETED')
 
 
     def _postTo(self, callbacks, service, nodeIdentifier,
@@ -462,7 +483,7 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
             return
 
         postdata = None
-        nodeURI = 'xmpp:%s?;node=%s' % (service.full(), nodeIdentifier)
+        nodeURI = getXMPPURI(service, nodeIdentifier)
         headers = {'Referer': nodeURI.encode('utf-8'),
                    'PubSub-Service': service.full().encode('utf-8')}
 
@@ -491,9 +512,7 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         def eb(failure):
             failure.trap(error.NoCallbacks)
 
-            # No callbacks were registered for this node. Unsubscribe.
-            d = self.unsubscribe(service, nodeIdentifier, self.jid)
-            return d
+            # No callbacks were registered for this node. Unsubscribe?
 
         d = self.storage.getCallbacks(service, nodeIdentifier)
         d.addCallback(self._postTo, service, nodeIdentifier, payload,
@@ -524,6 +543,8 @@ class RemoteSubscribeBaseResource(resource.Resource):
                 (responsecode.FORBIDDEN, "Node not found"),
             error.NotSubscribed:
                 (responsecode.FORBIDDEN, "No such subscription found"),
+            error.SubscriptionExists:
+                (responsecode.FORBIDDEN, "Subscription already exists"),
     }
 
     def __init__(self, service):
@@ -732,6 +753,13 @@ class GatewayClient(service.Service):
 
     def callback(self, data, headers):
         pass
+
+
+    def ping(self):
+        f = getPageWithFactory(self._makeURI(''),
+                               method='HEAD',
+                               agent=self.agent)
+        return f.deferred
 
 
     def create(self):

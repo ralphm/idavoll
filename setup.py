@@ -28,6 +28,8 @@ setup(name='idavoll',
       ],
       package_data={'twisted.plugins': ['twisted/plugins/idavoll.py',
                                         'twisted/plugins/idavoll_http.py']},
+      data_files=[('share/idavoll', ['db/pubsub.sql',
+                                     'db/to_idavoll_0.8.sql'])],
       zip_safe=False,
       install_requires=install_requires,
 )

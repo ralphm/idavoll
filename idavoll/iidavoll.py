@@ -13,7 +13,7 @@ class IBackendService(Interface):
 
     def __init__(storage):
         """
-        @param storage: L{storage} object.
+        @param storage: Object providing L{IStorage}.
         """
 
 
@@ -164,9 +164,38 @@ class IBackendService(Interface):
         """ Register callback which is called for notification. """
 
 
-    def getNotificationList(nodeIdentifier, items):
+    def getNotifications(nodeIdentifier, items):
         """
-        Get list of entities to notify.
+        Get notification list.
+
+        This method is called to discover which entities should receive
+        notifications for the given items that have just been published to the
+        given node.
+
+        The notification list contains tuples (subscriber, subscriptions,
+        items) to result in one notification per tuple: the given subscriptions
+        yielded the given items to be notified to this subscriber.  This
+        structure is needed allow for letting the subscriber know which
+        subscriptions yielded which notifications, while catering for
+        collection nodes and content-based subscriptions.
+
+        To minimize the amount of notifications per entity, implementers
+        should take care that if all items in C{items} were yielded
+        by the same set of subscriptions, exactly one tuple is for this
+        subscriber is returned, so that the subscriber would get exactly one
+        notification. Alternatively, one tuple per subscription combination.
+
+        @param nodeIdentifier: The identifier of the node the items were
+                               published to.
+        @type nodeIdentifier: C{unicode}.
+        @param items: The list of published items as
+                      L{Element<twisted.words.xish.domish.Element>}s.
+        @type items: C{list}
+        @return: The notification list as tuples of
+                 (L{JID<twisted.words.protocols.jabber.jid.JID>},
+                  C{list} of L{Subscription<wokkel.pubsub.Subscription>},
+                  C{list} of L{Element<twisted.words.xish.domish.Element>}.
+        @rtype: C{list}
         """
 
 
@@ -197,8 +226,8 @@ class IStorage(Interface):
         Get Node.
 
         @param nodeIdentifier: NodeID of the desired node.
-        @type nodeIdentifier: L{str}
-        @return: deferred that returns a L{Node} object.
+        @type nodeIdentifier: C{str}
+        @return: deferred that returns a L{INode} providing object.
         """
 
 
@@ -206,22 +235,26 @@ class IStorage(Interface):
         """
         Return all NodeIDs.
 
-        @return: deferred that returns a list of NodeIDs (L{str}).
+        @return: deferred that returns a list of NodeIDs (C{unicode}).
         """
 
 
-    def createNode(nodeIdentifier, owner, config=None):
+    def createNode(nodeIdentifier, owner, config):
         """
         Create new node.
 
         The implementation should make sure, the passed owner JID is stripped
-        of the resource (e.g. using C{owner.userhostJID()}).
+        of the resource (e.g. using C{owner.userhostJID()}). The passed config
+        is expected to have values for the fields returned by
+        L{getDefaultConfiguration}, as well as a value for
+        C{'pubsub#node_type'}.
 
         @param nodeIdentifier: NodeID of the new node.
-        @type nodeIdentifier: L{str}
+        @type nodeIdentifier: C{unicode}
         @param owner: JID of the new nodes's owner.
-        @type owner: L{jid.JID}
-        @param config: Configuration
+        @type owner: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @param config: Node configuration.
+        @type config: C{dict}
         @return: deferred that fires on creation.
         """
 
@@ -231,7 +264,7 @@ class IStorage(Interface):
         Delete a node.
 
         @param nodeIdentifier: NodeID of the new node.
-        @type nodeIdentifier: L{str}
+        @type nodeIdentifier: C{unicode}
         @return: deferred that fires on deletion.
         """
 
@@ -244,11 +277,11 @@ class IStorage(Interface):
         of the resource (e.g. using C{owner.userhostJID()}).
 
         @param entity: JID of the entity.
-        @type entity: L{jid.JID}
-        @return: deferred that returns a L{list} of tuples of the form
+        @type entity: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @return: deferred that returns a C{list} of tuples of the form
                  C{(nodeIdentifier, affiliation)}, where C{nodeIdentifier} is
-                 of the type L{str} and C{affiliation} is one of C{'owner'},
-                 C{'publisher'} and C{'outcast'}.
+                 of the type L{unicode} and C{affiliation} is one of
+                 C{'owner'}, C{'publisher'} and C{'outcast'}.
         """
 
 
@@ -260,12 +293,26 @@ class IStorage(Interface):
         of the resource (e.g. using C{owner.userhostJID()}).
 
         @param entity: JID of the entity.
-        @type entity: L{jid.JID}
-        @return: deferred that returns a L{list} of tuples of the form
+        @type entity: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @return: deferred that returns a C{list} of tuples of the form
                  C{(nodeIdentifier, subscriber, state)}, where
-                 C{nodeIdentifier} is of the type L{str}, C{subscriber} of the
-                 type {jid.JID}, and C{state} is C{'subscribed'} or
-                 C{'pending'}.
+                 C{nodeIdentifier} is of the type C{unicode}, C{subscriber} of
+                 the type J{JID<twisted.words.protocols.jabber.jid.JID>}, and
+                 C{state} is C{'subscribed'}, C{'pending'} or
+                 C{'unconfigured'}.
+        """
+
+
+    def getDefaultConfiguration(nodeType):
+        """
+        Get the default configuration for the given node type.
+
+        @param nodeType: Either C{'leaf'} or C{'collection'}.
+        @type nodeType: C{str}
+        @return: The default configuration.
+        @rtype: C{dict}.
+        @raises: L{idavoll.error.NoCollections} if collections are not
+                 supported.
         """
 
 
@@ -295,7 +342,7 @@ class INode(Interface):
         The configuration must at least have two options:
         C{pubsub#persist_items}, and C{pubsub#deliver_payloads}.
 
-        @return: L{dict} of configuration options.
+        @return: C{dict} of configuration options.
         """
 
 
@@ -306,7 +353,7 @@ class INode(Interface):
         The meta data must be a superset of the configuration options, and
         also at least should have a C{pubsub#node_type} entry.
 
-        @return: L{dict} of meta data.
+        @return: C{dict} of meta data.
         """
 
 
@@ -328,7 +375,7 @@ class INode(Interface):
         Get affiliation of entity with this node.
 
         @param entity: JID of entity.
-        @type entity: L{jid.JID}
+        @type entity: L{JID<twisted.words.protocols.jabber.jid.JID>}
         @return: deferred that returns C{'owner'}, C{'publisher'}, C{'outcast'}
                  or C{None}.
         """
@@ -339,20 +386,37 @@ class INode(Interface):
         Get subscription to this node of subscriber.
 
         @param subscriber: JID of the new subscriptions' entity.
-        @type subscriber: L{jid.JID}
+        @type subscriber: L{JID<twisted.words.protocols.jabber.jid.JID>}
         @return: deferred that returns the subscription state (C{'subscribed'},
                  C{'pending'} or C{None}).
         """
 
 
-    def addSubscription(subscriber, state):
+    def getSubscriptions(state=None):
+        """
+        Get list of subscriptions to this node.
+
+        The optional C{state} argument filters the subscriptions to their
+        state.
+
+        @param state: Subscription state filter. One of C{'subscribed'},
+                      C{'pending'}, C{'unconfigured'}.
+        @type state: C{str}
+        @return: a deferred that returns a C{list} of
+                 L{wokkel.pubsub.Subscription}s.
+        """
+
+
+    def addSubscription(subscriber, state, config):
         """
         Add new subscription to this node with given state.
 
         @param subscriber: JID of the new subscriptions' entity.
-        @type subscriber: L{jid.JID}
+        @type subscriber: L{JID<twisted.words.protocols.jabber.jid.JID>}
         @param state: C{'subscribed'} or C{'pending'}
-        @type state: L{str}
+        @type state: C{str}
+        @param config: Subscription configuration.
+        @param config: C{dict}
         @return: deferred that fires on subscription.
         """
 
@@ -362,19 +426,8 @@ class INode(Interface):
         Remove subscription to this node.
 
         @param subscriber: JID of the subscriptions' entity.
-        @type subscriber: L{jid.JID}
+        @type subscriber: L{JID<twisted.words.protocols.jabber.jid.JID>}
         @return: deferred that fires on removal.
-        """
-
-
-    def getSubscribers():
-        """
-        Get list of subscribers to this node.
-
-        Retrieves the list of entities that have a subscription to this
-        node. That is, having the state C{'subscribed'}.
-
-        @return: a deferred that returns a L{list} of L{jid.JID}s.
         """
 
 
@@ -386,8 +439,8 @@ class INode(Interface):
         C{'subscribed'} for any subscription that matches the bare JID.
 
         @param subscriber: bare JID of the subscriptions' entity.
-        @type subscriber: L{jid.JID}
-        @return: deferred that returns a L{bool}.
+        @type subscriber: L{JID<twisted.words.protocols.jabber.jid.JID>}
+        @return: deferred that returns a C{bool}.
         """
 
 
@@ -395,8 +448,9 @@ class INode(Interface):
         """
         Get affiliations of entities with this node.
 
-        @return: deferred that returns a L{list} of tuples (jid, affiliation),
-        where jid is a L(jid.JID) and affiliation is one of C{'owner'},
+        @return: deferred that returns a C{list} of tuples (jid, affiliation),
+                 where jid is a L(JID<twisted.words.protocols.jabber.jid.JID>)
+                 and affiliation is one of C{'owner'},
         C{'publisher'}, C{'outcast'}.
         """
 
@@ -415,9 +469,9 @@ class ILeafNode(Interface):
                       L{domish} representation of the XML fragment as defined
                       for C{<item/>} in the
                       C{http://jabber.org/protocol/pubsub} namespace.
-        @type items: L{list} of {domish.Element}
+        @type items: C{list} of {domish.Element}
         @param publisher: JID of the publishing entity.
-        @type publisher: L{jid.JID}
+        @type publisher: L{JID<twisted.words.protocols.jabber.jid.JID>}
         @return: deferred that fires upon success.
         """
 
@@ -426,8 +480,8 @@ class ILeafNode(Interface):
         """
         Remove items by id.
 
-        @param itemIdentifiers: L{list} of item ids.
-        @return: deferred that fires with a L{list} of ids of the items that
+        @param itemIdentifiers: C{list} of item ids.
+        @return: deferred that fires with a C{list} of ids of the items that
                  were deleted
         """
 
@@ -443,7 +497,7 @@ class ILeafNode(Interface):
 
         @param maxItems: if given, a natural number (>0) that limits the
                           returned number of items.
-        @return: deferred that fires with a L{list} of found items.
+        @return: deferred that fires with a C{list} of found items.
         """
 
 
@@ -455,8 +509,8 @@ class ILeafNode(Interface):
         represent the XML of the item as it was published, including the
         item wrapper with item id.
 
-        @param itemIdentifiers: L{list} of item ids.
-        @return: deferred that fires with a L{list} of found items.
+        @param itemIdentifiers: C{list} of item ids.
+        @return: deferred that fires with a C{list} of found items.
         """
 
 

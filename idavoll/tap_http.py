@@ -1,10 +1,11 @@
 # Copyright (c) 2003-2008 Ralph Meijer
 # See LICENSE for details.
 
-from twisted.application import internet, strports
+from twisted.application import internet, service, strports
 from twisted.conch import manhole, manhole_ssh
 from twisted.cred import portal, checkers
-from twisted.web2 import channel, resource, server
+from twisted.web2 import channel, log, resource, server
+from twisted.web2.tap import Web2Service
 
 from idavoll import gateway, tap
 from idavoll.gateway import RemoteSubscriptionService
@@ -13,6 +14,7 @@ class Options(tap.Options):
     optParameters = [
             ('webport', None, '8086', 'Web port'),
     ]
+
 
 
 def getManholeFactory(namespace, **passwords):
@@ -26,6 +28,7 @@ def getManholeFactory(namespace, **passwords):
             checkers.InMemoryUsernamePasswordDatabaseDontUse(**passwords))
     f = manhole_ssh.ConchFactory(p)
     return f
+
 
 
 def makeService(config):
@@ -67,13 +70,22 @@ def makeService(config):
 
     site = server.Site(root)
     w = internet.TCPServer(int(config['webport']), channel.HTTPFactory(site))
+
+    if config["verbose"]:
+        logObserver = log.DefaultCommonAccessLoggingObserver()
+        w2s = Web2Service(logObserver)
+        w.setServiceParent(w2s)
+        w = w2s
+
     w.setServiceParent(s)
 
     # Set up a manhole
 
     namespace = {'service': s,
                  'component': cs,
-                 'backend': bs}
+                 'backend': bs,
+                 'root': root}
+
     f = getManholeFactory(namespace, admin='admin')
     manholeService = strports.service('2222', f)
     manholeService.setServiceParent(s)

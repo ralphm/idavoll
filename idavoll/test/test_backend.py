@@ -5,6 +5,9 @@
 Tests for L{idavoll.backend}.
 """
 
+from zope.interface import implements
+from zope.interface.verify import verifyObject
+
 from twisted.internet import defer
 from twisted.trial import unittest
 from twisted.words.protocols.jabber import jid
@@ -12,22 +15,28 @@ from twisted.words.protocols.jabber.error import StanzaError
 
 from wokkel import pubsub
 
-from idavoll import backend, error
+from idavoll import backend, error, iidavoll
 
 OWNER = jid.JID('owner@example.com')
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 
 class BackendTest(unittest.TestCase):
+
+    def test_interfaceIBackend(self):
+        self.assertTrue(verifyObject(iidavoll.IBackendService,
+                                     backend.BackendService(None)))
+
+
     def test_deleteNode(self):
-        class testNode:
+        class TestNode:
             nodeIdentifier = 'to-be-deleted'
             def getAffiliation(self, entity):
                 if entity is OWNER:
                     return defer.succeed('owner')
 
-        class testStorage:
+        class TestStorage:
             def getNode(self, nodeIdentifier):
-                return defer.succeed(testNode())
+                return defer.succeed(TestNode())
 
             def deleteNode(self, nodeIdentifier):
                 if nodeIdentifier in ['to-be-deleted']:
@@ -44,7 +53,7 @@ class BackendTest(unittest.TestCase):
             self.assertTrue(self.preDeleteCalled)
             self.assertTrue(self.storage.deleteCalled)
 
-        self.storage = testStorage()
+        self.storage = TestStorage()
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
@@ -61,12 +70,15 @@ class BackendTest(unittest.TestCase):
         """
         Test creation of a node without a given node identifier.
         """
-        class testStorage:
-            def createNode(self, nodeIdentifier, requestor):
+        class TestStorage:
+            def getDefaultConfiguration(self, nodeType):
+                return {}
+
+            def createNode(self, nodeIdentifier, requestor, config):
                 self.nodeIdentifier = nodeIdentifier
                 return defer.succeed(None)
 
-        self.storage = testStorage()
+        self.storage = TestStorage()
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
@@ -78,6 +90,112 @@ class BackendTest(unittest.TestCase):
         d.addCallback(checkID)
         return d
 
+    class NodeStore:
+        """
+        I just store nodes to pose as an L{IStorage} implementation.
+        """
+        def __init__(self, nodes):
+            self.nodes = nodes
+
+        def getNode(self, nodeIdentifier):
+            try:
+                return defer.succeed(self.nodes[nodeIdentifier])
+            except KeyError:
+                return defer.fail(error.NodeNotFound())
+
+
+    def test_getNotifications(self):
+        """
+        Ensure subscribers show up in the notification list.
+        """
+        item = pubsub.Item()
+        sub = pubsub.Subscription('test', OWNER, 'subscribed')
+
+        class TestNode:
+            def getSubscriptions(self, state=None):
+                return [sub]
+
+        def cb(result):
+            self.assertEquals(1, len(result))
+            subscriber, subscriptions, items = result[-1]
+
+            self.assertEquals(OWNER, subscriber)
+            self.assertEquals(set([sub]), subscriptions)
+            self.assertEquals([item], items)
+
+        self.storage = self.NodeStore({'test': TestNode()})
+        self.backend = backend.BackendService(self.storage)
+        d = self.backend.getNotifications('test', [item])
+        d.addCallback(cb)
+        return d
+
+    def test_getNotificationsRoot(self):
+        """
+        Ensure subscribers to the root node show up in the notification list
+        for leaf nodes.
+
+        This assumes a flat node relationship model with exactly one collection
+        node: the root node. Each leaf node is automatically a child node
+        of the root node.
+        """
+        item = pubsub.Item()
+        subRoot = pubsub.Subscription('', OWNER, 'subscribed')
+
+        class TestNode:
+            def getSubscriptions(self, state=None):
+                return []
+
+        class TestRootNode:
+            def getSubscriptions(self, state=None):
+                return [subRoot]
+
+        def cb(result):
+            self.assertEquals(1, len(result))
+            subscriber, subscriptions, items = result[-1]
+            self.assertEquals(OWNER, subscriber)
+            self.assertEquals(set([subRoot]), subscriptions)
+            self.assertEquals([item], items)
+
+        self.storage = self.NodeStore({'test': TestNode(),
+                                       '': TestRootNode()})
+        self.backend = backend.BackendService(self.storage)
+        d = self.backend.getNotifications('test', [item])
+        d.addCallback(cb)
+        return d
+
+
+    def test_getNotificationsMultipleNodes(self):
+        """
+        Ensure that entities that subscribe to a leaf node as well as the
+        root node get exactly one notification.
+        """
+        item = pubsub.Item()
+        sub = pubsub.Subscription('test', OWNER, 'subscribed')
+        subRoot = pubsub.Subscription('', OWNER, 'subscribed')
+
+        class TestNode:
+            def getSubscriptions(self, state=None):
+                return [sub]
+
+        class TestRootNode:
+            def getSubscriptions(self, state=None):
+                return [subRoot]
+
+        def cb(result):
+            self.assertEquals(1, len(result))
+            subscriber, subscriptions, items = result[-1]
+
+            self.assertEquals(OWNER, subscriber)
+            self.assertEquals(set([sub, subRoot]), subscriptions)
+            self.assertEquals([item], items)
+
+        self.storage = self.NodeStore({'test': TestNode(),
+                                       '': TestRootNode()})
+        self.backend = backend.BackendService(self.storage)
+        d = self.backend.getNotifications('test', [item])
+        d.addCallback(cb)
+        return d
+
 
     def test_getDefaultConfiguration(self):
         """
@@ -85,12 +203,18 @@ class BackendTest(unittest.TestCase):
         a deferred that fires a dictionary with configuration values.
         """
 
+        class TestStorage:
+            def getDefaultConfiguration(self, nodeType):
+                return {
+                    "pubsub#persist_items": True,
+                    "pubsub#deliver_payloads": True}
+
         def cb(options):
             self.assertIn("pubsub#persist_items", options)
             self.assertEqual(True, options["pubsub#persist_items"])
 
-        self.backend = backend.BackendService(None)
-        d = self.backend.getDefaultConfiguration()
+        self.backend = backend.BackendService(TestStorage())
+        d = self.backend.getDefaultConfiguration('leaf')
         d.addCallback(cb)
         return d
 
@@ -164,7 +288,8 @@ class BackendTest(unittest.TestCase):
         """
         Test publish request with an item without a node identifier.
         """
-        class testNode:
+        class TestNode:
+            nodeType = 'leaf'
             nodeIdentifier = 'node'
             def getAffiliation(self, entity):
                 if entity is OWNER:
@@ -173,14 +298,14 @@ class BackendTest(unittest.TestCase):
                 return {'pubsub#deliver_payloads': True,
                         'pubsub#persist_items': False}
 
-        class testStorage:
+        class TestStorage:
             def getNode(self, nodeIdentifier):
-                return defer.succeed(testNode())
+                return defer.succeed(TestNode())
 
         def checkID(notification):
             self.assertNotIdentical(None, notification['items'][0]['id'])
 
-        self.storage = testStorage()
+        self.storage = TestStorage()
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
@@ -197,8 +322,10 @@ class BackendTest(unittest.TestCase):
         """
         ITEM = "<item xmlns='%s' id='1'/>" % NS_PUBSUB
 
-        class testNode:
+        class TestNode:
+            implements(iidavoll.ILeafNode)
             nodeIdentifier = 'node'
+            nodeType = 'leaf'
             def getAffiliation(self, entity):
                 if entity is OWNER:
                     return defer.succeed('owner')
@@ -208,19 +335,23 @@ class BackendTest(unittest.TestCase):
                         'pubsub#send_last_published_item': 'on_sub'}
             def getItems(self, maxItems):
                 return [ITEM]
-            def addSubscription(self, subscriber, state):
+            def addSubscription(self, subscriber, state, options):
+                self.subscription = pubsub.Subscription('node', subscriber,
+                                                        state, options)
                 return defer.succeed(None)
+            def getSubscription(self, subscriber):
+                return defer.succeed(self.subscription)
 
-        class testStorage:
+        class TestStorage:
             def getNode(self, nodeIdentifier):
-                return defer.succeed(testNode())
+                return defer.succeed(TestNode())
 
         def cb(data):
             self.assertEquals('node', data['nodeIdentifier'])
             self.assertEquals([ITEM], data['items'])
-            self.assertEquals(OWNER, data['subscriber'])
+            self.assertEquals(OWNER, data['subscription'].subscriber)
 
-        self.storage = testStorage()
+        self.storage = TestStorage()
         self.backend = backend.BackendService(self.storage)
         self.storage.backend = self.backend
 
@@ -311,7 +442,7 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
 
     def test_getConfigurationOptions(self):
         class TestBackend(BaseTestBackend):
-            options = {
+            nodeOptions = {
                     "pubsub#persist_items":
                         {"type": "boolean",
                          "label": "Persist items to storage"},
@@ -327,7 +458,7 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
 
     def test_getDefaultConfiguration(self):
         class TestBackend(BaseTestBackend):
-            def getDefaultConfiguration(self):
+            def getDefaultConfiguration(self, nodeType):
                 options = {"pubsub#persist_items": True,
                            "pubsub#deliver_payloads": True,
                            "pubsub#send_last_published_item": 'on_sub',
@@ -338,6 +469,6 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             self.assertEquals(True, options["pubsub#persist_items"])
 
         s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.getDefaultConfiguration(OWNER, 'test.example.org')
+        d = s.getDefaultConfiguration(OWNER, 'test.example.org', 'leaf')
         d.addCallback(cb)
         return d
