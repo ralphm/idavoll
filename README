@@ -1,4 +1,4 @@
-Idavoll 0.7.3
+Idavoll 0.8.0
 
 What is this?
 ================
@@ -21,7 +21,8 @@ Installing
 ==========
 
 Instructions for installing, configuring and running this software are in
-INSTALL.
+INSTALL. Also refer to UPGRADING for instruction on upgrading from older
+versions of Idavoll.
 
 Copyright
 =========

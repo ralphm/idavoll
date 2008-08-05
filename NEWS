@@ -1,3 +1,16 @@
+0.8.0 (2008-08-05)
+==================
+
+ - Complete API method name change to conform to Twisted's naming conventions.
+ - Change so that stored items are stripped of the pubsub namespace, this makes
+   notifications have the proper namespace for items.
+ - Match an API change in Wokkel for the HTTP gateway.
+ - Add persistent storage for the HTTP gateway's record of subscriptions and
+   callbacks.
+ - Adjust node configuration code to match Wokkel's API changes for data forms.
+ - Implement a root collection that includes all leaf nodes.
+
+
 0.7.3 (2008-05-30)
 ==================
 
