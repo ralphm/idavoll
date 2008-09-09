@@ -1,0 +1,18 @@
+Upgrading
+=========
+
+To 0.8.0
+========
+
+This release includes an optional HTTP interface with a gateway to subscribe
+to remote nodes. The subscriptions and associated callbacks are stored in
+the database if the PostgreSQL storage backend is used. This requires a new
+table, of which the schema is in db/gateway.sql:
+
+    psql -e pubsub <db/gateway.sql
+
+The schema of the other tables has also changed significantly compared to
+0.7.3 and older. For these changes, there is an upgrade script in the form
+of a series of SQL statements to be run against an database with the older schema: db/to_idavoll_0.8.sql, like so:
+
+    psql -e pubsub <db/to_idavoll_0.8.sql

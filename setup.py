@@ -15,7 +15,7 @@ if sys.version_info < (2, 5):
     install_requires.append('uuid')
 
 setup(name='idavoll',
-      version='0.8.0',
+      version='0.8.1',
       description='Jabber Publish-Subscribe Service Component',
       author='Ralph Meijer',
       author_email='ralphm@ik.nu',
