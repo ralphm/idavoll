@@ -97,6 +97,86 @@ class GatewayTest(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+    def test_delete(self):
+        def cb(response):
+            xmppURI = response['uri']
+            d = self.client.delete(xmppURI)
+            return d
+
+        d = self.client.create()
+        d.addCallback(cb)
+        return d
+
+    def test_deleteWithRedirect(self):
+        def cb(response):
+            xmppURI = response['uri']
+            redirectURI = 'xmpp:%s?node=test' % componentJID
+            d = self.client.delete(xmppURI, redirectURI)
+            return d
+
+        d = self.client.create()
+        d.addCallback(cb)
+        return d
+
+    def test_deleteNotification(self):
+        def onNotification(data, headers):
+            try:
+                self.assertTrue(headers.hasHeader('Event'))
+                self.assertEquals(['DELETED'], headers.getRawHeaders('Event'))
+                self.assertFalse(headers.hasHeader('Link'))
+            except:
+                self.client.deferred.errback()
+            else:
+                self.client.deferred.callback(None)
+
+        def cb(response):
+            xmppURI = response['uri']
+            d = self.client.subscribe(xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb2(xmppURI):
+            d = self.client.delete(xmppURI)
+            return d
+
+        self.client.callback = onNotification
+        self.client.deferred = defer.Deferred()
+        d = self.client.create()
+        d.addCallback(cb)
+        d.addCallback(cb2)
+        return defer.gatherResults([d, self.client.deferred])
+
+    def test_deleteNotificationWithRedirect(self):
+        redirectURI = 'xmpp:%s?node=test' % componentJID
+
+        def onNotification(data, headers):
+            try:
+                self.assertTrue(headers.hasHeader('Event'))
+                self.assertEquals(['DELETED'], headers.getRawHeaders('Event'))
+                self.assertEquals(['<%s>; rel=alternate' % redirectURI],
+                                  headers.getRawHeaders('Link'))
+            except:
+                self.client.deferred.errback()
+            else:
+                self.client.deferred.callback(None)
+
+        def cb(response):
+            xmppURI = response['uri']
+            d = self.client.subscribe(xmppURI)
+            d.addCallback(lambda _: xmppURI)
+            return d
+
+        def cb2(xmppURI):
+            d = self.client.delete(xmppURI, redirectURI)
+            return d
+
+        self.client.callback = onNotification
+        self.client.deferred = defer.Deferred()
+        d = self.client.create()
+        d.addCallback(cb)
+        d.addCallback(cb2)
+        return defer.gatherResults([d, self.client.deferred])
+
     def test_list(self):
         d = self.client.listNodes()
         return d

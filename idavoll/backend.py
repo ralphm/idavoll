@@ -434,20 +434,23 @@ class BackendService(service.Service, utility.EventDispatcher):
         return d
 
 
-    def deleteNode(self, nodeIdentifier, requestor):
+    def deleteNode(self, nodeIdentifier, requestor, redirectURI=None):
         d = self.storage.getNode(nodeIdentifier)
         d.addCallback(_getAffiliation, requestor)
-        d.addCallback(self._doPreDelete)
+        d.addCallback(self._doPreDelete, redirectURI)
         return d
 
 
-    def _doPreDelete(self, result):
+    def _doPreDelete(self, result, redirectURI):
         node, affiliation = result
 
         if affiliation != 'owner':
             raise error.Forbidden()
 
-        d = defer.DeferredList([cb(node.nodeIdentifier)
+        data = {'nodeIdentifier': node.nodeIdentifier,
+                'redirectURI': redirectURI}
+
+        d = defer.DeferredList([cb(data)
                                 for cb in self._callbackList],
                                consumeErrors=1)
         d.addCallback(self._doDelete, node.nodeIdentifier)
@@ -561,11 +564,14 @@ class PubSubServiceFromBackend(PubSubService):
                                                                notifications))
 
 
-    def _preDelete(self, nodeIdentifier):
+    def _preDelete(self, data):
+        nodeIdentifier = data['nodeIdentifier']
+        redirectURI = data.get('redirectURI', None)
         d = self.backend.getSubscribers(nodeIdentifier)
         d.addCallback(lambda subscribers: self.notifyDelete(self.serviceJID,
                                                             nodeIdentifier,
-                                                            subscribers))
+                                                            subscribers,
+                                                            redirectURI))
         return d
 
 

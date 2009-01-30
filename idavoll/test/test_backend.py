@@ -13,11 +13,12 @@ from twisted.trial import unittest
 from twisted.words.protocols.jabber import jid
 from twisted.words.protocols.jabber.error import StanzaError
 
-from wokkel import pubsub
+from wokkel import iwokkel, pubsub
 
 from idavoll import backend, error, iidavoll
 
 OWNER = jid.JID('owner@example.com')
+SERVICE = jid.JID('test.example.org')
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 
 class BackendTest(unittest.TestCase):
@@ -35,33 +36,83 @@ class BackendTest(unittest.TestCase):
                     return defer.succeed('owner')
 
         class TestStorage:
+            def __init__(self):
+                self.deleteCalled = []
+
             def getNode(self, nodeIdentifier):
                 return defer.succeed(TestNode())
 
             def deleteNode(self, nodeIdentifier):
                 if nodeIdentifier in ['to-be-deleted']:
-                    self.deleteCalled = True
+                    self.deleteCalled.append(nodeIdentifier)
                     return defer.succeed(None)
                 else:
                     return defer.fail(error.NodeNotFound())
 
-        def preDelete(nodeIdentifier):
-            self.preDeleteCalled = True
+        def preDelete(data):
+            self.assertFalse(self.storage.deleteCalled)
+            preDeleteCalled.append(data)
             return defer.succeed(None)
 
         def cb(result):
-            self.assertTrue(self.preDeleteCalled)
+            self.assertEquals(1, len(preDeleteCalled))
+            data = preDeleteCalled[-1]
+            self.assertEquals('to-be-deleted', data['nodeIdentifier'])
             self.assertTrue(self.storage.deleteCalled)
 
         self.storage = TestStorage()
         self.backend = backend.BackendService(self.storage)
-        self.storage.backend = self.backend
 
-        self.preDeleteCalled = False
-        self.deleteCalled = False
+        preDeleteCalled = []
 
         self.backend.registerPreDelete(preDelete)
         d = self.backend.deleteNode('to-be-deleted', OWNER)
+        d.addCallback(cb)
+        return d
+
+
+    def test_deleteNodeRedirect(self):
+        uri = 'xmpp:%s?;node=test2' % (SERVICE.full(),)
+
+        class TestNode:
+            nodeIdentifier = 'to-be-deleted'
+            def getAffiliation(self, entity):
+                if entity is OWNER:
+                    return defer.succeed('owner')
+
+        class TestStorage:
+            def __init__(self):
+                self.deleteCalled = []
+
+            def getNode(self, nodeIdentifier):
+                return defer.succeed(TestNode())
+
+            def deleteNode(self, nodeIdentifier):
+                if nodeIdentifier in ['to-be-deleted']:
+                    self.deleteCalled.append(nodeIdentifier)
+                    return defer.succeed(None)
+                else:
+                    return defer.fail(error.NodeNotFound())
+
+        def preDelete(data):
+            self.assertFalse(self.storage.deleteCalled)
+            preDeleteCalled.append(data)
+            return defer.succeed(None)
+
+        def cb(result):
+            self.assertEquals(1, len(preDeleteCalled))
+            data = preDeleteCalled[-1]
+            self.assertEquals('to-be-deleted', data['nodeIdentifier'])
+            self.assertEquals(uri, data['redirectURI'])
+            self.assertTrue(self.storage.deleteCalled)
+
+        self.storage = TestStorage()
+        self.backend = backend.BackendService(self.storage)
+
+        preDeleteCalled = []
+
+        self.backend.registerPreDelete(preDelete)
+        d = self.backend.deleteNode('to-be-deleted', OWNER, redirectURI=uri)
         d.addCallback(cb)
         return d
 
@@ -397,6 +448,80 @@ class BaseTestBackend(object):
 
 class PubSubServiceFromBackendTest(unittest.TestCase):
 
+    def test_interfaceIBackend(self):
+        s = backend.PubSubServiceFromBackend(BaseTestBackend())
+        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
+
+
+    def test_preDelete(self):
+        """
+        Test pre-delete sending out notifications to subscribers.
+        """
+
+        class TestBackend(BaseTestBackend):
+            preDeleteFn = None
+
+            def registerPreDelete(self, preDeleteFn):
+                self.preDeleteFn = preDeleteFn
+
+            def getSubscribers(self, nodeIdentifier):
+                return defer.succeed([OWNER])
+
+        def notifyDelete(service, nodeIdentifier, subscribers,
+                         redirectURI=None):
+            self.assertEqual(SERVICE, service)
+            self.assertEqual('test', nodeIdentifier)
+            self.assertEqual([OWNER], subscribers)
+            self.assertIdentical(None, redirectURI)
+            d1.callback(None)
+
+        d1 = defer.Deferred()
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        s.serviceJID = SERVICE
+        s.notifyDelete = notifyDelete
+        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
+        self.assertNotIdentical(None, s.backend.preDeleteFn)
+        data = {'nodeIdentifier': 'test'}
+        d2 = s.backend.preDeleteFn(data)
+        return defer.DeferredList([d1, d2], fireOnOneErrback=1)
+
+
+    def test_preDeleteRedirect(self):
+        """
+        Test pre-delete sending out notifications to subscribers.
+        """
+
+        uri = 'xmpp:%s?;node=test2' % (SERVICE.full(),)
+
+        class TestBackend(BaseTestBackend):
+            preDeleteFn = None
+
+            def registerPreDelete(self, preDeleteFn):
+                self.preDeleteFn = preDeleteFn
+
+            def getSubscribers(self, nodeIdentifier):
+                return defer.succeed([OWNER])
+
+        def notifyDelete(service, nodeIdentifier, subscribers,
+                         redirectURI=None):
+            self.assertEqual(SERVICE, service)
+            self.assertEqual('test', nodeIdentifier)
+            self.assertEqual([OWNER], subscribers)
+            self.assertEqual(uri, redirectURI)
+            d1.callback(None)
+
+        d1 = defer.Deferred()
+        s = backend.PubSubServiceFromBackend(TestBackend())
+        s.serviceJID = SERVICE
+        s.notifyDelete = notifyDelete
+        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
+        self.assertNotIdentical(None, s.backend.preDeleteFn)
+        data = {'nodeIdentifier': 'test',
+                'redirectURI': uri}
+        d2 = s.backend.preDeleteFn(data)
+        return defer.DeferredList([d1, d2], fireOnOneErrback=1)
+
+
     def test_unsubscribeNotSubscribed(self):
         """
         Test unsubscription request when not subscribed.
@@ -410,7 +535,7 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             self.assertEquals('unexpected-request', e.condition)
 
         s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.unsubscribe(OWNER, 'test.example.org', 'test', OWNER)
+        d = s.unsubscribe(OWNER, SERVICE, 'test', OWNER)
         self.assertFailure(d, StanzaError)
         d.addCallback(cb)
         return d
@@ -435,7 +560,7 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             self.assertEquals({'pubsub#persist_items': True}, info['meta-data'])
 
         s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.getNodeInfo(OWNER, 'test.example.org', 'test')
+        d = s.getNodeInfo(OWNER, SERVICE, 'test')
         d.addCallback(cb)
         return d
 
@@ -469,6 +594,6 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             self.assertEquals(True, options["pubsub#persist_items"])
 
         s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.getDefaultConfiguration(OWNER, 'test.example.org', 'leaf')
+        d = s.getDefaultConfiguration(OWNER, SERVICE, 'leaf')
         d.addCallback(cb)
         return d

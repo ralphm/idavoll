@@ -171,16 +171,27 @@ class DeleteResource(resource.Resource):
         Respond to a POST request to create a new node.
         """
 
-        def respond(result):
-            return http.Response(responsecode.NO_CONTENT)
-
-        def getNode():
+        def gotStream(_):
             if request.args.get('uri'):
                 jid, nodeIdentifier = getServiceAndNode(request.args['uri'][0])
                 return defer.succeed(nodeIdentifier)
             else:
                 raise http.HTTPError(http.Response(responsecode.BAD_REQUEST,
                                                    "No URI given"))
+
+        def doDelete(nodeIdentifier, data):
+            if data:
+                params = simplejson.loads(''.join(data))
+                redirectURI = params.get('redirect_uri')
+            else:
+                redirectURI = None
+
+            return self.backend.deleteNode(nodeIdentifier, self.owner,
+                                           redirectURI)
+
+        def respond(result):
+            return http.Response(responsecode.NO_CONTENT)
+
 
         def trapNotFound(failure):
             failure.trap(error.NodeNotFound)
@@ -192,8 +203,10 @@ class DeleteResource(resource.Resource):
             return http.StatusResponse(responsecode.BAD_REQUEST,
                     "Malformed XMPP URI: %s" % failure.value.message)
 
-        d = getNode()
-        d.addCallback(self.backend.deleteNode, self.owner)
+        data = []
+        d = readStream(request.stream, data.append)
+        d.addCallback(gotStream)
+        d.addCallback(doDelete, data)
         d.addCallback(respond)
         d.addErrback(trapNotFound)
         d.addErrback(trapXMPPURIParseError)
@@ -473,11 +486,14 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
 
         service = event.sender
         nodeIdentifier = event.nodeIdentifier
-        self.callCallbacks(service, nodeIdentifier, eventType='DELETED')
+        redirectURI = event.redirectURI
+        self.callCallbacks(service, nodeIdentifier, eventType='DELETED',
+                           redirectURI=redirectURI)
 
 
     def _postTo(self, callbacks, service, nodeIdentifier,
-                      payload=None, contentType=None, eventType=None):
+                      payload=None, contentType=None, eventType=None,
+                      redirectURI=None):
 
         if not callbacks:
             return
@@ -495,6 +511,11 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
         if eventType:
             headers['Event'] = eventType
 
+        if redirectURI:
+            headers['Link'] = '<%s>; rel=alternate' % (
+                              redirectURI.encode('utf-8'),
+                              )
+
         def postNotification(callbackURI):
             d = client.getPage(str(callbackURI),
                                    method='POST',
@@ -507,7 +528,8 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
 
 
     def callCallbacks(self, service, nodeIdentifier,
-                            payload=None, contentType=None, eventType=None):
+                            payload=None, contentType=None, eventType=None,
+                            redirectURI=None):
 
         def eb(failure):
             failure.trap(error.NoCallbacks)
@@ -516,7 +538,7 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
 
         d = self.storage.getCallbacks(service, nodeIdentifier)
         d.addCallback(self._postTo, service, nodeIdentifier, payload,
-                                    contentType, eventType)
+                                    contentType, eventType, redirectURI)
         d.addErrback(eb)
         d.addErrback(log.err)
 
@@ -708,7 +730,10 @@ class CallbackResource(resource.Resource):
 
     def http_POST(self, request):
         p = WebStreamParser()
-        d = p.parse(request.stream)
+        if not request.headers.hasHeader('Event'):
+            d = p.parse(request.stream)
+        else:
+            d = defer.succeed(None)
         d.addCallback(self.callback, request.headers)
         d.addCallback(lambda _: http.Response(responsecode.NO_CONTENT))
         return d
@@ -767,6 +792,25 @@ class GatewayClient(service.Service):
                     method='POST',
                     agent=self.agent)
         return f.deferred.addCallback(simplejson.loads)
+
+
+    def delete(self, xmppURI, redirectURI=None):
+        query = {'uri': xmppURI}
+
+        if redirectURI:
+            params = {'redirect_uri': redirectURI}
+            postdata = simplejson.dumps(params)
+            headers = {'Content-Type': MIME_JSON}
+        else:
+            postdata = None
+            headers = None
+
+        f = getPageWithFactory(self._makeURI('delete', query),
+                    method='POST',
+                    postdata=postdata,
+                    headers=headers,
+                    agent=self.agent)
+        return f.deferred
 
 
     def publish(self, entry, xmppURI=None):
