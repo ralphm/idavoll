@@ -68,7 +68,7 @@ def getServiceAndNode(uri):
     try:
         service = JID(entity)
     except Exception, e:
-        raise XMPPURIParseError("Invalid JID: %s" % e.message)
+        raise XMPPURIParseError("Invalid JID: %s" % e)
 
     params = cgi.parse_qs(query)
 
@@ -201,7 +201,7 @@ class DeleteResource(resource.Resource):
         def trapXMPPURIParseError(failure):
             failure.trap(XMPPURIParseError)
             return http.StatusResponse(responsecode.BAD_REQUEST,
-                    "Malformed XMPP URI: %s" % failure.value.message)
+                    "Malformed XMPP URI: %s" % failure.value)
 
         data = []
         d = readStream(request.stream, data.append)
@@ -291,7 +291,7 @@ class PublishResource(resource.Resource):
         def trapXMPPURIParseError(failure):
             failure.trap(XMPPURIParseError)
             return http.StatusResponse(responsecode.BAD_REQUEST,
-                    "Malformed XMPP URI: %s" % failure.value.message)
+                    "Malformed XMPP URI: %s" % failure.value)
 
         self.checkMediaType(request)
         d = self.parseXMLPayload(request.stream)
@@ -601,7 +601,7 @@ class RemoteSubscribeBaseResource(resource.Resource):
         def trapXMPPURIParseError(failure):
             failure.trap(XMPPURIParseError)
             return http.StatusResponse(responsecode.BAD_REQUEST,
-                    "Malformed XMPP URI: %s" % failure.value.message)
+                    "Malformed XMPP URI: %s" % failure.value)
 
         d = readStream(request.stream, storeParams)
         d.addCallback(gotRequest)
