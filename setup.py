@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2003-2008 Ralph Meijer
+# Copyright (c) 2003-2009 Ralph Meijer
 # See LICENSE for details.
 
 import sys
 from setuptools import setup
 
 install_requires = [
-    'wokkel >= 0.4.0',
+    'wokkel >= 0.5.0',
     'simplejson',
 ]
 
@@ -15,7 +15,7 @@ if sys.version_info < (2, 5):
     install_requires.append('uuid')
 
 setup(name='idavoll',
-      version='0.8.1',
+      version='0.9.0',
       description='Jabber Publish-Subscribe Service Component',
       author='Ralph Meijer',
       author_email='ralphm@ik.nu',

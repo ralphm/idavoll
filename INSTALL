@@ -8,7 +8,7 @@ Requirements
    - Twisted Web2 (for idavoll-http)
    - Twisted Words
 - uuid.py (Python 2.5 std. lib. or http://pypi.python.org/pypi/uuid)
-- Wokkel >= 0.4.0 (http://wokkel.ik.nu/)
+- Wokkel >= 0.5.0 (http://wokkel.ik.nu/)
 - simplejson (for idavoll-http)
 - A Jabber server that supports the component protocol (XEP-0114)
 

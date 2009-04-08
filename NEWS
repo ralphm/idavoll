@@ -1,3 +1,11 @@
+0.9.0 (2009-04-07)
+==================
+
+ - Track changes to Wokkel, require version 0.5.0.
+ - Add support for node deletion with redirect.
+ - Fix error reporting for older Python versions.
+
+
 0.8.1 (2008-08-05)
 ==================
 
