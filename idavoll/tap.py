@@ -1,4 +1,4 @@
-# Copyright (c) 2003-2008 Ralph Meijer
+# Copyright (c) 2003-2009 Ralph Meijer
 # See LICENSE for details.
 
 from twisted.application import service
@@ -12,7 +12,7 @@ from wokkel.iwokkel import IPubSubService
 
 from idavoll.backend import BackendService
 
-__version__ = '0.8.1'
+__version__ = '0.9.0'
 
 class Options(usage.Options):
     optParameters = [
