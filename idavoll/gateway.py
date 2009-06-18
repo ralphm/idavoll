@@ -517,10 +517,11 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
                               )
 
         def postNotification(callbackURI):
-            d = client.getPage(str(callbackURI),
+            f = getPageWithFactory(str(callbackURI),
                                    method='POST',
                                    postdata=postdata,
                                    headers=headers)
+            d = f.deferred
             d.addErrback(log.err)
 
         for callbackURI in callbacks:
