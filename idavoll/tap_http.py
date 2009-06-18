@@ -68,6 +68,9 @@ def makeService(config):
     root.child_unsubscribe = gateway.RemoteUnsubscribeResource(ss)
     root.child_items = gateway.RemoteItemsResource(ss)
 
+    if config["verbose"]:
+        root = log.LogWrapperResource(root)
+
     site = server.Site(root)
     w = internet.TCPServer(int(config['webport']), channel.HTTPFactory(site))
 
