@@ -291,7 +291,6 @@ class GatewayStorage(object):
             callbacks.add(callback)
             pass
 
-        print self.callbacks
         return defer.succeed(None)
 
 
