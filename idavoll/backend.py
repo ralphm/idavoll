@@ -222,7 +222,7 @@ class BackendService(service.Service, utility.EventDispatcher):
 
     def subscribe(self, nodeIdentifier, subscriber, requestor):
         subscriberEntity = subscriber.userhostJID()
-        if subscriberEntity != requestor:
+        if subscriberEntity != requestor.userhostJID():
             return defer.fail(error.Forbidden())
 
         d = self.storage.getNode(nodeIdentifier)
@@ -276,7 +276,7 @@ class BackendService(service.Service, utility.EventDispatcher):
 
 
     def unsubscribe(self, nodeIdentifier, subscriber, requestor):
-        if subscriber.userhostJID() != requestor:
+        if subscriber.userhostJID() != requestor.userhostJID():
             return defer.fail(error.Forbidden())
 
         d = self.storage.getNode(nodeIdentifier)
