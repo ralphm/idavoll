@@ -10,9 +10,8 @@ from wokkel.disco import DiscoHandler
 from wokkel.generic import FallbackHandler, VersionHandler
 from wokkel.iwokkel import IPubSubService
 
+from idavoll import __version__
 from idavoll.backend import BackendService
-
-__version__ = '0.9.0'
 
 class Options(usage.Options):
     optParameters = [

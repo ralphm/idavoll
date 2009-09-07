@@ -5,6 +5,7 @@
 
 import sys
 from setuptools import setup
+from idavoll import __version__
 
 install_requires = [
     'wokkel >= 0.5.0',
@@ -15,7 +16,7 @@ if sys.version_info < (2, 5):
     install_requires.append('uuid')
 
 setup(name='idavoll',
-      version='0.9.0',
+      version=__version__,
       description='Jabber Publish-Subscribe Service Component',
       author='Ralph Meijer',
       author_email='ralphm@ik.nu',
@@ -24,7 +25,6 @@ setup(name='idavoll',
       packages=[
           'idavoll',
           'idavoll.test',
-          'twisted.plugins',
       ],
       package_data={'twisted.plugins': ['twisted/plugins/idavoll.py',
                                         'twisted/plugins/idavoll_http.py']},

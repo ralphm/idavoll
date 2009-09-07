@@ -1,3 +1,13 @@
+0.9.1 (2009-09-07)
+==================
+
+ - Log HTTP requests if verbose logging is on.
+ - Make HTTP requests with 204 responses don't result in failure.
+ - Remove some debug logging.
+ - Fix subscription and unsubscription JID checking.
+ - Fix zope import warning.
+
+
 0.9.0 (2009-04-07)
 ==================
 
