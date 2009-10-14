@@ -48,9 +48,9 @@ def makeService(config):
         from idavoll.pgsql_storage import Storage
         dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
                                        user=config['dbuser'],
-                                       password=config['dbuser'],
+                                       password=config['dbpass'],
                                        database=config['dbname'],
-                                       host=config['dbpass'],
+                                       host=config['dbhost'],
                                        port=config['dbport'],
                                        cp_reconnect=True,
                                        client_encoding='utf-8',
