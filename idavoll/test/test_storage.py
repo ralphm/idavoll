@@ -101,6 +101,35 @@ class StorageTests:
         return d
 
 
+    def test_createNodeChangingConfig(self):
+        """
+        The configuration passed to createNode must be free to be changed.
+        """
+        def cb(result):
+            node1, node2 = result
+            self.assertTrue(node1.getConfiguration()['pubsub#persist_items'])
+
+        config = {
+                "pubsub#persist_items": True,
+                "pubsub#deliver_payloads": True,
+                "pubsub#send_last_published_item": 'on_sub',
+                "pubsub#node_type": 'leaf',
+                }
+
+        def unsetPersistItems(_):
+            config["pubsub#persist_items"] = False
+
+        d = defer.succeed(None)
+        d.addCallback(lambda _: self.s.createNode('new 1', OWNER, config))
+        d.addCallback(unsetPersistItems)
+        d.addCallback(lambda _: self.s.createNode('new 2', OWNER, config))
+        d.addCallback(lambda _: defer.gatherResults([
+                                    self.s.getNode('new 1'),
+                                    self.s.getNode('new 2')]))
+        d.addCallback(cb)
+        return d
+
+
     def test_deleteNonExistingNode(self):
         d = self.s.deleteNode('non-existing')
         self.assertFailure(d, error.NodeNotFound)

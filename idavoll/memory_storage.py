@@ -100,7 +100,7 @@ class Node:
         self.nodeIdentifier = nodeIdentifier
         self._affiliations = {owner.userhost(): 'owner'}
         self._subscriptions = {}
-        self._config = config
+        self._config = copy.copy(config)
 
 
     def getType(self):
