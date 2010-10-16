@@ -21,10 +21,11 @@ from twisted.application import service
 from twisted.python import components, log
 from twisted.internet import defer, reactor
 from twisted.words.protocols.jabber.error import StanzaError
-from twisted.words.xish import domish, utility
+from twisted.words.xish import utility
 
-from wokkel.iwokkel import IDisco, IPubSubService
-from wokkel.pubsub import PubSubService, PubSubError
+from wokkel import disco
+from wokkel.iwokkel import IPubSubResource
+from wokkel.pubsub import PubSubResource, PubSubError
 
 from idavoll import error, iidavoll
 from idavoll.iidavoll import IBackendService, ILeafNode
@@ -474,12 +475,33 @@ class BackendService(service.Service, utility.EventDispatcher):
 
 
 
-class PubSubServiceFromBackend(PubSubService):
+class PubSubResourceFromBackend(PubSubResource):
     """
     Adapts a backend to an xmpp publish-subscribe service.
     """
 
-    implements(IDisco)
+    features = [
+        "config-node",
+        "create-nodes",
+        "delete-any",
+        "delete-nodes",
+        "item-ids",
+        "meta-data",
+        "publish",
+        "purge-nodes",
+        "retract-items",
+        "retrieve-affiliations",
+        "retrieve-default",
+        "retrieve-items",
+        "retrieve-subscriptions",
+        "subscribe",
+    ]
+
+    discoIdentity = disco.DiscoIdentity('pubsub',
+                                        'service',
+                                        'Idavoll publish-subscribe service')
+
+    pubsubService = None
 
     _errorMap = {
         error.NodeNotFound: ('item-not-found', None, None),
@@ -506,48 +528,25 @@ class PubSubServiceFromBackend(PubSubService):
     }
 
     def __init__(self, backend):
-        PubSubService.__init__(self)
+        PubSubResource.__init__(self)
 
         self.backend = backend
         self.hideNodes = False
 
-        self.pubSubFeatures = self._getPubSubFeatures()
-
         self.backend.registerNotifier(self._notify)
         self.backend.registerPreDelete(self._preDelete)
 
-
-    def _getPubSubFeatures(self):
-        features = [
-            "config-node",
-            "create-nodes",
-            "delete-any",
-            "delete-nodes",
-            "item-ids",
-            "meta-data",
-            "publish",
-            "purge-nodes",
-            "retract-items",
-            "retrieve-affiliations",
-            "retrieve-default",
-            "retrieve-items",
-            "retrieve-subscriptions",
-            "subscribe",
-        ]
-
         if self.backend.supportsInstantNodes():
-            features.append("instant-nodes")
+            self.features.append("instant-nodes")
 
         if self.backend.supportsOutcastAffiliation():
-            features.append("outcast-affiliation")
+            self.features.append("outcast-affiliation")
 
         if self.backend.supportsPersistentItems():
-            features.append("persistent-items")
+            self.features.append("persistent-items")
 
         if self.backend.supportsPublisherAffiliation():
-            features.append("publisher-affiliation")
-
-        return features
+            self.features.append("publisher-affiliation")
 
 
     def _notify(self, data):
@@ -559,19 +558,21 @@ class PubSubServiceFromBackend(PubSubService):
             subscription = data['subscription']
             d = defer.succeed([(subscription.subscriber, [subscription],
                                 items)])
-        d.addCallback(lambda notifications: self.notifyPublish(self.serviceJID,
-                                                               nodeIdentifier,
-                                                               notifications))
+        d.addCallback(lambda notifications: self.pubsubService.notifyPublish(
+                                                self.serviceJID,
+                                                nodeIdentifier,
+                                                notifications))
 
 
     def _preDelete(self, data):
         nodeIdentifier = data['nodeIdentifier']
         redirectURI = data.get('redirectURI', None)
         d = self.backend.getSubscribers(nodeIdentifier)
-        d.addCallback(lambda subscribers: self.notifyDelete(self.serviceJID,
-                                                            nodeIdentifier,
-                                                            subscribers,
-                                                            redirectURI))
+        d.addCallback(lambda subscribers: self.pubsubService.notifyDelete(
+                                                self.serviceJID,
+                                                nodeIdentifier,
+                                                subscribers,
+                                                redirectURI))
         return d
 
 
@@ -589,7 +590,7 @@ class PubSubServiceFromBackend(PubSubService):
         raise exc
 
 
-    def getNodeInfo(self, requestor, service, nodeIdentifier):
+    def getInfo(self, requestor, service, nodeIdentifier):
         info = {}
 
         def saveType(result):
@@ -614,40 +615,10 @@ class PubSubServiceFromBackend(PubSubService):
         return d
 
 
-    def getNodes(self, requestor, service):
+    def getNodes(self, requestor, service, nodeIdentifier):
         if service.resource:
             return defer.succeed([])
         d = self.backend.getNodes()
-        return d.addErrback(self._mapErrors)
-
-
-    def publish(self, requestor, service, nodeIdentifier, items):
-        d = self.backend.publish(nodeIdentifier, items, requestor)
-        return d.addErrback(self._mapErrors)
-
-
-    def subscribe(self, requestor, service, nodeIdentifier, subscriber):
-        d = self.backend.subscribe(nodeIdentifier, subscriber, requestor)
-        return d.addErrback(self._mapErrors)
-
-
-    def unsubscribe(self, requestor, service, nodeIdentifier, subscriber):
-        d = self.backend.unsubscribe(nodeIdentifier, subscriber, requestor)
-        return d.addErrback(self._mapErrors)
-
-
-    def subscriptions(self, requestor, service):
-        d = self.backend.getSubscriptions(requestor)
-        return d.addErrback(self._mapErrors)
-
-
-    def affiliations(self, requestor, service):
-        d = self.backend.getAffiliations(requestor)
-        return d.addErrback(self._mapErrors)
-
-
-    def create(self, requestor, service, nodeIdentifier):
-        d = self.backend.createNode(nodeIdentifier, requestor)
         return d.addErrback(self._mapErrors)
 
 
@@ -655,44 +626,86 @@ class PubSubServiceFromBackend(PubSubService):
         return self.backend.nodeOptions
 
 
-    def getDefaultConfiguration(self, requestor, service, nodeType):
-        d = self.backend.getDefaultConfiguration(nodeType)
+    def publish(self, request):
+        d = self.backend.publish(request.nodeIdentifier,
+                                 request.items,
+                                 request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def getConfiguration(self, requestor, service, nodeIdentifier):
-        d = self.backend.getNodeConfiguration(nodeIdentifier)
+    def subscribe(self, request):
+        d = self.backend.subscribe(request.nodeIdentifier,
+                                   request.subscriber,
+                                   request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def setConfiguration(self, requestor, service, nodeIdentifier, options):
-        d = self.backend.setNodeConfiguration(nodeIdentifier, options,
-                                                requestor)
+    def unsubscribe(self, request):
+        d = self.backend.unsubscribe(request.nodeIdentifier,
+                                     request.subscriber,
+                                     request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def items(self, requestor, service, nodeIdentifier, maxItems,
-                    itemIdentifiers):
-        d = self.backend.getItems(nodeIdentifier, requestor, maxItems,
-                                   itemIdentifiers)
+    def subscriptions(self, request):
+        d = self.backend.getSubscriptions(request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def retract(self, requestor, service, nodeIdentifier, itemIdentifiers):
-        d = self.backend.retractItem(nodeIdentifier, itemIdentifiers,
-                                      requestor)
+    def affiliations(self, request):
+        d = self.backend.getAffiliations(request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def purge(self, requestor, service, nodeIdentifier):
-        d = self.backend.purgeNode(nodeIdentifier, requestor)
+    def create(self, request):
+        d = self.backend.createNode(request.nodeIdentifier,
+                                    request.sender)
         return d.addErrback(self._mapErrors)
 
 
-    def delete(self, requestor, service, nodeIdentifier):
-        d = self.backend.deleteNode(nodeIdentifier, requestor)
+    def default(self, request):
+        d = self.backend.getDefaultConfiguration(request.nodeType)
         return d.addErrback(self._mapErrors)
 
-components.registerAdapter(PubSubServiceFromBackend,
+
+    def configureGet(self, request):
+        d = self.backend.getNodeConfiguration(request.nodeIdentifier)
+        return d.addErrback(self._mapErrors)
+
+
+    def configureSet(self, request):
+        d = self.backend.setNodeConfiguration(request.nodeIdentifier,
+                                              request.options,
+                                              request.sender)
+        return d.addErrback(self._mapErrors)
+
+
+    def items(self, request):
+        d = self.backend.getItems(request.nodeIdentifier,
+                                  request.sender,
+                                  request.maxItems,
+                                  request.itemIdentifiers)
+        return d.addErrback(self._mapErrors)
+
+
+    def retract(self, request):
+        d = self.backend.retractItem(request.nodeIdentifier,
+                                     request.itemIdentifiers,
+                                     request.sender)
+        return d.addErrback(self._mapErrors)
+
+
+    def purge(self, request):
+        d = self.backend.purgeNode(request.nodeIdentifier,
+                                   request.sender)
+        return d.addErrback(self._mapErrors)
+
+
+    def delete(self, request):
+        d = self.backend.deleteNode(request.nodeIdentifier,
+                                    request.sender)
+        return d.addErrback(self._mapErrors)
+
+components.registerAdapter(PubSubResourceFromBackend,
                            IBackendService,
-                           IPubSubService)
+                           IPubSubResource)

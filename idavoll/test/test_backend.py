@@ -447,11 +447,11 @@ class BaseTestBackend(object):
 
 
 
-class PubSubServiceFromBackendTest(unittest.TestCase):
+class PubSubResourceFromBackendTest(unittest.TestCase):
 
-    def test_interfaceIBackend(self):
-        s = backend.PubSubServiceFromBackend(BaseTestBackend())
-        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
+    def test_interface(self):
+        resource = backend.PubSubResourceFromBackend(BaseTestBackend())
+        self.assertTrue(verifyObject(iwokkel.IPubSubResource, resource))
 
 
     def test_preDelete(self):
@@ -477,13 +477,14 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             d1.callback(None)
 
         d1 = defer.Deferred()
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        s.serviceJID = SERVICE
-        s.notifyDelete = notifyDelete
-        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
-        self.assertNotIdentical(None, s.backend.preDeleteFn)
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        resource.serviceJID = SERVICE
+        resource.pubsubService = pubsub.PubSubService()
+        resource.pubsubService.notifyDelete = notifyDelete
+        self.assertTrue(verifyObject(iwokkel.IPubSubResource, resource))
+        self.assertNotIdentical(None, resource.backend.preDeleteFn)
         data = {'nodeIdentifier': 'test'}
-        d2 = s.backend.preDeleteFn(data)
+        d2 = resource.backend.preDeleteFn(data)
         return defer.DeferredList([d1, d2], fireOnOneErrback=1)
 
 
@@ -512,14 +513,15 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             d1.callback(None)
 
         d1 = defer.Deferred()
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        s.serviceJID = SERVICE
-        s.notifyDelete = notifyDelete
-        self.assertTrue(verifyObject(iwokkel.IPubSubService, s))
-        self.assertNotIdentical(None, s.backend.preDeleteFn)
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        resource.serviceJID = SERVICE
+        resource.pubsubService = pubsub.PubSubService()
+        resource.pubsubService.notifyDelete = notifyDelete
+        self.assertTrue(verifyObject(iwokkel.IPubSubResource, resource))
+        self.assertNotIdentical(None, resource.backend.preDeleteFn)
         data = {'nodeIdentifier': 'test',
                 'redirectURI': uri}
-        d2 = s.backend.preDeleteFn(data)
+        d2 = resource.backend.preDeleteFn(data)
         return defer.DeferredList([d1, d2], fireOnOneErrback=1)
 
 
@@ -535,14 +537,19 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
         def cb(e):
             self.assertEquals('unexpected-request', e.condition)
 
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.unsubscribe(OWNER, SERVICE, 'test', OWNER)
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        request = pubsub.PubSubRequest()
+        request.sender = OWNER
+        request.recipient = SERVICE
+        request.nodeIdentifier = 'test'
+        request.subscriber = OWNER
+        d = resource.unsubscribe(request)
         self.assertFailure(d, StanzaError)
         d.addCallback(cb)
         return d
 
 
-    def test_getNodeInfo(self):
+    def test_getInfo(self):
         """
         Test retrieving node information.
         """
@@ -560,8 +567,8 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
             self.assertIn('meta-data', info)
             self.assertEquals({'pubsub#persist_items': True}, info['meta-data'])
 
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.getNodeInfo(OWNER, SERVICE, 'test')
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        d = resource.getInfo(OWNER, SERVICE, 'test')
         d.addCallback(cb)
         return d
 
@@ -577,12 +584,12 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
                          "label": "Deliver payloads with event notifications"}
             }
 
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        options = s.getConfigurationOptions()
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        options = resource.getConfigurationOptions()
         self.assertIn("pubsub#persist_items", options)
 
 
-    def test_getDefaultConfiguration(self):
+    def test_default(self):
         class TestBackend(BaseTestBackend):
             def getDefaultConfiguration(self, nodeType):
                 options = {"pubsub#persist_items": True,
@@ -594,7 +601,11 @@ class PubSubServiceFromBackendTest(unittest.TestCase):
         def cb(options):
             self.assertEquals(True, options["pubsub#persist_items"])
 
-        s = backend.PubSubServiceFromBackend(TestBackend())
-        d = s.getDefaultConfiguration(OWNER, SERVICE, 'leaf')
+        resource = backend.PubSubResourceFromBackend(TestBackend())
+        request = pubsub.PubSubRequest()
+        request.sender = OWNER
+        request.recipient = SERVICE
+        request.nodeType = 'leaf'
+        d = resource.default(request)
         d.addCallback(cb)
         return d

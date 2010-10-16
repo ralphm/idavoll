@@ -8,7 +8,8 @@ from twisted.words.protocols.jabber.jid import JID
 from wokkel.component import Component
 from wokkel.disco import DiscoHandler
 from wokkel.generic import FallbackHandler, VersionHandler
-from wokkel.iwokkel import IPubSubService
+from wokkel.iwokkel import IPubSubResource
+from wokkel.pubsub import PubSubService
 
 from idavoll import __version__
 from idavoll.backend import BackendService
@@ -37,6 +38,8 @@ class Options(usage.Options):
             raise usage.UsageError, "Unknown backend!"
 
         self['jid'] = JID(self['jid'])
+
+
 
 def makeService(config):
     s = service.MultiService()
@@ -80,9 +83,12 @@ def makeService(config):
     VersionHandler('Idavoll', __version__).setHandlerParent(cs)
     DiscoHandler().setHandlerParent(cs)
 
-    ps = IPubSubService(bs)
+    resource = IPubSubResource(bs)
+    resource.hideNodes = config["hide-nodes"]
+    resource.serviceJID = config["jid"]
+
+    ps = PubSubService(resource)
     ps.setHandlerParent(cs)
-    ps.hideNodes = config["hide-nodes"]
-    ps.serviceJID = config["jid"]
+    resource.pubsubService = ps
 
     return s
