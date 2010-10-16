@@ -11,8 +11,6 @@ from twisted.words.protocols.jabber import jid
 from twisted.internet import defer
 from twisted.words.xish import domish
 
-from wokkel import pubsub
-
 from idavoll import error, iidavoll
 
 OWNER = jid.JID('owner@example.com')
@@ -447,10 +445,13 @@ class MemoryStorageStorageTestCase(unittest.TestCase, StorageTests):
 
 class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
 
+    dbpool = None
+
     def setUp(self):
         from idavoll.pgsql_storage import Storage
         from twisted.enterprise import adbapi
-        self.dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+        if self.dbpool is None:
+            self.__class__.dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
                                             database='pubsub_test',
                                             cp_reconnect=True,
                                             client_encoding='utf-8',
