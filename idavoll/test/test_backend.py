@@ -18,6 +18,7 @@ from wokkel import iwokkel, pubsub
 from idavoll import backend, error, iidavoll
 
 OWNER = jid.JID('owner@example.com')
+OWNER_FULL = jid.JID('owner@example.com/home')
 SERVICE = jid.JID('test.example.org')
 NS_PUBSUB = 'http://jabber.org/protocol/pubsub'
 
@@ -32,7 +33,7 @@ class BackendTest(unittest.TestCase):
         class TestNode:
             nodeIdentifier = 'to-be-deleted'
             def getAffiliation(self, entity):
-                if entity is OWNER:
+                if entity.userhostJID() == OWNER:
                     return defer.succeed('owner')
 
         class TestStorage:
@@ -66,7 +67,7 @@ class BackendTest(unittest.TestCase):
         preDeleteCalled = []
 
         self.backend.registerPreDelete(preDelete)
-        d = self.backend.deleteNode('to-be-deleted', OWNER)
+        d = self.backend.deleteNode('to-be-deleted', OWNER_FULL)
         d.addCallback(cb)
         return d
 
@@ -77,7 +78,7 @@ class BackendTest(unittest.TestCase):
         class TestNode:
             nodeIdentifier = 'to-be-deleted'
             def getAffiliation(self, entity):
-                if entity is OWNER:
+                if entity.userhostJID() == OWNER:
                     return defer.succeed('owner')
 
         class TestStorage:
@@ -137,7 +138,7 @@ class BackendTest(unittest.TestCase):
             self.assertNotIdentical(None, nodeIdentifier)
             self.assertIdentical(self.storage.nodeIdentifier, nodeIdentifier)
 
-        d = self.backend.createNode(None, OWNER)
+        d = self.backend.createNode(None, OWNER_FULL)
         d.addCallback(checkID)
         return d
 
@@ -300,7 +301,7 @@ class BackendTest(unittest.TestCase):
         class testNode:
             nodeIdentifier = 'node'
             def getAffiliation(self, entity):
-                if entity is OWNER:
+                if entity.userhostJID() == OWNER:
                     return defer.succeed('owner')
             def setConfiguration(self, options):
                 self.options = options
@@ -330,7 +331,7 @@ class BackendTest(unittest.TestCase):
         options = {'pubsub#deliver_payloads': True,
                    'pubsub#persist_items': False}
 
-        d = self.backend.setNodeConfiguration('node', options, OWNER)
+        d = self.backend.setNodeConfiguration('node', options, OWNER_FULL)
         d.addCallback(cb)
         return d
 
@@ -343,7 +344,7 @@ class BackendTest(unittest.TestCase):
             nodeType = 'leaf'
             nodeIdentifier = 'node'
             def getAffiliation(self, entity):
-                if entity is OWNER:
+                if entity.userhostJID() == OWNER:
                     return defer.succeed('owner')
             def getConfiguration(self):
                 return {'pubsub#deliver_payloads': True,
@@ -363,7 +364,7 @@ class BackendTest(unittest.TestCase):
         self.backend.registerNotifier(checkID)
 
         items = [pubsub.Item()]
-        d = self.backend.publish('node', items, OWNER)
+        d = self.backend.publish('node', items, OWNER_FULL)
         return d
 
 
@@ -409,7 +410,7 @@ class BackendTest(unittest.TestCase):
         d1 = defer.Deferred()
         d1.addCallback(cb)
         self.backend.registerNotifier(d1.callback)
-        d2 = self.backend.subscribe('node', OWNER, OWNER)
+        d2 = self.backend.subscribe('node', OWNER, OWNER_FULL)
         return defer.gatherResults([d1, d2])
 
     test_notifyOnSubscription.timeout = 2
