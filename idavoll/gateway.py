@@ -416,6 +416,8 @@ class RemoteSubscriptionService(service.Service, PubSubClient):
 
         def subscribeOrItems(hasCallbacks):
             if hasCallbacks:
+                if not nodeIdentifier:
+                    return None
                 d = self.items(jid, nodeIdentifier, 1)
                 d.addCallback(callbackForLastItem)
             else:
