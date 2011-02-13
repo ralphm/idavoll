@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2003-2009 Ralph Meijer
+# Copyright (c) 2003-2011 Ralph Meijer
 # See LICENSE for details.
 
 import sys
@@ -30,7 +30,9 @@ setup(name='idavoll',
                                         'twisted/plugins/idavoll_http.py']},
       data_files=[('share/idavoll', ['db/pubsub.sql',
                                      'db/gateway.sql',
-                                     'db/to_idavoll_0.8.sql'])],
+                                     'db/to_idavoll_0.8.sql',
+                                     'doc/examples/idavoll.tac',
+                                     ])],
       zip_safe=False,
       install_requires=install_requires,
 )
