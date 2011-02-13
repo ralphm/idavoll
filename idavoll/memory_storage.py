@@ -126,7 +126,7 @@ class Node:
 
 
     def getAffiliation(self, entity):
-        return defer.succeed(self._affiliations.get(entity.full()))
+        return defer.succeed(self._affiliations.get(entity.userhost()))
 
 
     def getSubscription(self, subscriber):

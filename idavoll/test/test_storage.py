@@ -13,7 +13,7 @@ from twisted.words.xish import domish
 
 from idavoll import error, iidavoll
 
-OWNER = jid.JID('owner@example.com')
+OWNER = jid.JID('owner@example.com/Work')
 SUBSCRIBER = jid.JID('subscriber@example.com/Home')
 SUBSCRIBER_NEW = jid.JID('new@example.com/Home')
 SUBSCRIBER_TO_BE_DELETED = jid.JID('to_be_deleted@example.com/Home')
@@ -421,7 +421,7 @@ class StorageTests:
 
         def cb2(affiliations):
             affiliations = dict(((a[0].full(), a[1]) for a in affiliations))
-            self.assertEquals(affiliations[OWNER.full()], 'owner')
+            self.assertEquals(affiliations[OWNER.userhost()], 'owner')
 
         d = self.s.getNode('pre-existing')
         d.addCallback(cb1)
