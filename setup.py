@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2003-2011 Ralph Meijer
+# Copyright (c) Ralph Meijer.
 # See LICENSE for details.
 
 import sys
