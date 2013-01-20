@@ -8,12 +8,20 @@ Note that some tests are functional tests that require a running idavoll
 service.
 """
 
+from StringIO import StringIO
+
+import simplejson
+
 from twisted.internet import defer
 from twisted.trial import unittest
-from twisted.web import error
+from twisted.web import error, http, http_headers, server
+from twisted.web.test import requesthelper
 from twisted.words.xish import domish
+from twisted.words.protocols.jabber.jid import JID
 
 from idavoll import gateway
+from idavoll.backend import BackendService
+from idavoll.memory_storage import Storage
 
 AGENT = "Idavoll Test Script"
 NS_ATOM = "http://www.w3.org/2005/Atom"
@@ -26,7 +34,350 @@ TEST_ENTRY.addElement("author").addElement("name", content="John Doe")
 TEST_ENTRY.addElement("content", content="Some text.")
 
 baseURI = "http://localhost:8086/"
-componentJID = "pubsub"
+component = "pubsub"
+componentJID = JID(component)
+ownerJID = JID('owner@example.org')
+
+def _render(resource, request):
+    result = resource.render(request)
+    if isinstance(result, str):
+        request.write(result)
+        request.finish()
+        return defer.succeed(None)
+    elif result is server.NOT_DONE_YET:
+        if request.finished:
+            return defer.succeed(None)
+        else:
+            return request.notifyFinish()
+    else:
+        raise ValueError("Unexpected return value: %r" % (result,))
+
+
+class DummyRequest(requesthelper.DummyRequest):
+
+    def __init__(self, *args, **kwargs):
+        requesthelper.DummyRequest.__init__(self, *args, **kwargs)
+        self.requestHeaders = http_headers.Headers()
+
+
+
+class GetServiceAndNodeTest(unittest.TestCase):
+    """
+    Tests for {gateway.getServiceAndNode}.
+    """
+
+    def test_basic(self):
+        """
+        getServiceAndNode parses an XMPP URI with node parameter.
+        """
+        uri = b'xmpp:pubsub.example.org?;node=test'
+        service, nodeIdentifier = gateway.getServiceAndNode(uri)
+        self.assertEqual(JID(u'pubsub.example.org'), service)
+        self.assertEqual(u'test', nodeIdentifier)
+
+
+    def test_schemeEmpty(self):
+        """
+        If the URI scheme is empty, an exception is raised.
+        """
+        uri = b'pubsub.example.org'
+        self.assertRaises(gateway.XMPPURIParseError,
+                          gateway.getServiceAndNode, uri)
+
+
+    def test_schemeNotXMPP(self):
+        """
+        If the URI scheme is not 'xmpp', an exception is raised.
+        """
+        uri = b'mailto:test@example.org'
+        self.assertRaises(gateway.XMPPURIParseError,
+                          gateway.getServiceAndNode, uri)
+
+
+    def test_authorityPresent(self):
+        """
+        If the URI has an authority component, an exception is raised.
+        """
+        uri = b'xmpp://pubsub.example.org/'
+        self.assertRaises(gateway.XMPPURIParseError,
+                          gateway.getServiceAndNode, uri)
+
+
+    def test_queryEmpty(self):
+        """
+        If there is no query component, the nodeIdentifier is empty.
+        """
+        uri = b'xmpp:pubsub.example.org'
+        service, nodeIdentifier = gateway.getServiceAndNode(uri)
+
+        self.assertEqual(JID(u'pubsub.example.org'), service)
+        self.assertEqual(u'', nodeIdentifier)
+
+
+    def test_jidInvalid(self):
+        """
+        If the JID from the path component is invalid, an exception is raised.
+        """
+        uri = b'xmpp:@@pubsub.example.org?;node=test'
+        self.assertRaises(gateway.XMPPURIParseError,
+                          gateway.getServiceAndNode, uri)
+
+
+    def test_pathEmpty(self):
+        """
+        If there is no path component, an exception is raised.
+        """
+        uri = b'xmpp:?node=test'
+        self.assertRaises(gateway.XMPPURIParseError,
+                          gateway.getServiceAndNode, uri)
+
+
+    def test_nodeAbsent(self):
+        """
+        If the node parameter is missing, the nodeIdentifier is empty.
+        """
+        uri = b'xmpp:pubsub.example.org?'
+        service, nodeIdentifier = gateway.getServiceAndNode(uri)
+
+        self.assertEqual(JID(u'pubsub.example.org'), service)
+        self.assertEqual(u'', nodeIdentifier)
+
+
+
+class GetXMPPURITest(unittest.TestCase):
+    """
+    Tests for L{gateway.getXMPPURITest}.
+    """
+
+    def test_basic(self):
+        uri = gateway.getXMPPURI(JID(u'pubsub.example.org'), u'test')
+        self.assertEqual('xmpp:pubsub.example.org?;node=test', uri)
+
+
+class CreateResourceTest(unittest.TestCase):
+    """
+    Tests for L{gateway.CreateResource}.
+    """
+
+    def setUp(self):
+        self.backend = BackendService(Storage())
+        self.resource = gateway.CreateResource(self.backend, componentJID,
+                                               ownerJID)
+
+
+    def test_get(self):
+        """
+        The method GET is not supported.
+        """
+        request = DummyRequest([b''])
+        self.assertRaises(error.UnsupportedMethod,
+                          _render, self.resource, request)
+
+
+    def test_post(self):
+        """
+        Upon a POST, a new node is created and the URI returned.
+        """
+        request = DummyRequest([b''])
+        request.method = 'POST'
+
+        def gotNodes(nodeIdentifiers, uri):
+            service, nodeIdentifier = gateway.getServiceAndNode(uri)
+            self.assertIn(nodeIdentifier, nodeIdentifiers)
+
+        def rendered(result):
+            self.assertEqual('application/json',
+                             request.outgoingHeaders['content-type'])
+            payload = simplejson.loads(b''.join(request.written))
+            self.assertIn('uri', payload)
+            d = self.backend.getNodes()
+            d.addCallback(gotNodes, payload['uri'])
+            return d
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
+
+class DeleteResourceTest(unittest.TestCase):
+    """
+    Tests for L{gateway.DeleteResource}.
+    """
+
+    def setUp(self):
+        self.backend = BackendService(Storage())
+        self.resource = gateway.DeleteResource(self.backend, componentJID,
+                                               ownerJID)
+
+
+    def test_get(self):
+        """
+        The method GET is not supported.
+        """
+        request = DummyRequest([b''])
+        self.assertRaises(error.UnsupportedMethod,
+                          _render, self.resource, request)
+
+
+    def test_post(self):
+        """
+        Upon a POST, a new node is created and the URI returned.
+        """
+        request = DummyRequest([b''])
+        request.method = b'POST'
+
+        def rendered(result):
+            self.assertEqual(http.NO_CONTENT, request.responseCode)
+
+        def nodeCreated(nodeIdentifier):
+            uri = gateway.getXMPPURI(componentJID, nodeIdentifier)
+            request.args[b'uri'] = [uri]
+            request.content = StringIO(b'')
+
+            return _render(self.resource, request)
+
+        d = self.backend.createNode(u'test', ownerJID)
+        d.addCallback(nodeCreated)
+        d.addCallback(rendered)
+        return d
+
+
+    def test_postWithRedirect(self):
+        """
+        Upon a POST, a new node is created and the URI returned.
+        """
+        request = DummyRequest([b''])
+        request.method = b'POST'
+        otherNodeURI = b'xmpp:pubsub.example.org?node=other'
+
+        def rendered(result):
+            self.assertEqual(http.NO_CONTENT, request.responseCode)
+            self.assertEqual(1, len(deletes))
+            nodeIdentifier, owner, redirectURI = deletes[-1]
+            self.assertEqual(otherNodeURI, redirectURI)
+
+        def nodeCreated(nodeIdentifier):
+            uri = gateway.getXMPPURI(componentJID, nodeIdentifier)
+            request.args[b'uri'] = [uri]
+            payload = {b'redirect_uri': otherNodeURI}
+            body = simplejson.dumps(payload)
+            request.content = StringIO(body)
+            return _render(self.resource, request)
+
+        def deleteNode(nodeIdentifier, owner, redirectURI):
+            deletes.append((nodeIdentifier, owner, redirectURI))
+            return defer.succeed(nodeIdentifier)
+
+        deletes = []
+        self.patch(self.backend, 'deleteNode', deleteNode)
+        d = self.backend.createNode(u'test', ownerJID)
+        d.addCallback(nodeCreated)
+        d.addCallback(rendered)
+        return d
+
+
+    def test_postUnknownNode(self):
+        """
+        If the node to be deleted is unknown, 404 Not Found is returned.
+        """
+        request = DummyRequest([b''])
+        request.method = b'POST'
+
+        def rendered(result):
+            self.assertEqual(http.NOT_FOUND, request.responseCode)
+
+        uri = gateway.getXMPPURI(componentJID, u'unknown')
+        request.args[b'uri'] = [uri]
+        request.content = StringIO(b'')
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
+    def test_postURIMissing(self):
+        """
+        If no URI is passed, 400 Bad Request is returned.
+        """
+        request = DummyRequest([b''])
+        request.method = b'POST'
+
+        def rendered(result):
+            self.assertEqual(http.BAD_REQUEST, request.responseCode)
+
+        request.content = StringIO(b'')
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
+class CallbackResourceTest(unittest.TestCase):
+    """
+    Tests for L{gateway.CallbackResource}.
+    """
+
+    def setUp(self):
+        self.callbackEvents = []
+        self.resource = gateway.CallbackResource(self._callback)
+
+
+    def _callback(self, payload, headers):
+        self.callbackEvents.append((payload, headers))
+
+
+    def test_get(self):
+        """
+        The method GET is not supported.
+        """
+        request = DummyRequest([b''])
+        self.assertRaises(error.UnsupportedMethod,
+                          _render, self.resource, request)
+
+
+    def test_post(self):
+        """
+        The body posted is passed to the callback.
+        """
+        request = DummyRequest([b''])
+        request.method = 'POST'
+        request.content = StringIO(b'<root><child/></root>')
+
+        def rendered(result):
+            self.assertEqual(1, len(self.callbackEvents))
+            payload, headers = self.callbackEvents[-1]
+            self.assertEqual('root', payload.name)
+
+            self.assertEqual(http.NO_CONTENT, request.responseCode)
+            self.assertFalse(b''.join(request.written))
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
+    def test_postEvent(self):
+        """
+        If the Event header is set, the payload is empty and the header passed.
+        """
+        request = DummyRequest([b''])
+        request.method = 'POST'
+        request.requestHeaders.addRawHeader(b'Event', b'DELETE')
+        request.content = StringIO(b'')
+
+        def rendered(result):
+            self.assertEqual(1, len(self.callbackEvents))
+            payload, headers = self.callbackEvents[-1]
+            self.assertIdentical(None, payload)
+            self.assertEqual(['DELETE'], headers.getRawHeaders(b'Event'))
+            self.assertFalse(b''.join(request.written))
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
 
 class GatewayTest(unittest.TestCase):
     timeout = 2
@@ -92,7 +443,7 @@ class GatewayTest(unittest.TestCase):
         def cb(err):
             self.assertEqual('404', err.status)
 
-        d = self.client.publish(TEST_ENTRY, 'xmpp:%s?node=test' % componentJID)
+        d = self.client.publish(TEST_ENTRY, 'xmpp:%s?node=test' % component)
         self.assertFailure(d, error.Error)
         d.addCallback(cb)
         return d
@@ -110,7 +461,7 @@ class GatewayTest(unittest.TestCase):
     def test_deleteWithRedirect(self):
         def cb(response):
             xmppURI = response['uri']
-            redirectURI = 'xmpp:%s?node=test' % componentJID
+            redirectURI = 'xmpp:%s?node=test' % component
             d = self.client.delete(xmppURI, redirectURI)
             return d
 
@@ -147,7 +498,7 @@ class GatewayTest(unittest.TestCase):
         return defer.gatherResults([d, self.client.deferred])
 
     def test_deleteNotificationWithRedirect(self):
-        redirectURI = 'xmpp:%s?node=test' % componentJID
+        redirectURI = 'xmpp:%s?node=test' % component
 
         def onNotification(data, headers):
             try:
@@ -334,13 +685,16 @@ class GatewayTest(unittest.TestCase):
         def cb(err):
             self.assertEqual('403', err.status)
 
-        d = self.client.subscribe('xmpp:%s?node=test' % componentJID)
+        d = self.client.subscribe('xmpp:%s?node=test' % component)
         self.assertFailure(d, error.Error)
         d.addCallback(cb)
         return d
 
 
     def test_subscribeRootGetNotification(self):
+
+        def clean(rootNode):
+            return self.client.unsubscribe(rootNode)
 
         def onNotification(data, headers):
             self.client.deferred.callback(None)
@@ -351,6 +705,7 @@ class GatewayTest(unittest.TestCase):
             rootNode = gateway.getXMPPURI(jid, '')
 
             d = self.client.subscribe(rootNode)
+            d.addCallback(lambda _: self.addCleanup(clean, rootNode))
             d.addCallback(lambda _: xmppURI)
             return d
 
@@ -370,7 +725,7 @@ class GatewayTest(unittest.TestCase):
         def cb(err):
             self.assertEqual('403', err.status)
 
-        d = self.client.unsubscribe('xmpp:%s?node=test' % componentJID)
+        d = self.client.unsubscribe('xmpp:%s?node=test' % component)
         self.assertFailure(d, error.Error)
         d.addCallback(cb)
         return d
