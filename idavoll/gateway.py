@@ -686,17 +686,16 @@ def getPageWithFactory(url, contextFactory=None, *args, **kwargs):
     See HTTPClientFactory to see what extra args can be passed.
     """
 
-    scheme, host, port, path = client._parse(url)
     factory = client.HTTPClientFactory(url, *args, **kwargs)
     factory.protocol.handleStatus_204 = lambda self: self.handleStatus_200()
 
-    if scheme == 'https':
+    if factory.scheme == 'https':
         from twisted.internet import ssl
         if contextFactory is None:
             contextFactory = ssl.ClientContextFactory()
-        reactor.connectSSL(host, port, factory, contextFactory)
+        reactor.connectSSL(factory.host, factory.port, factory, contextFactory)
     else:
-        reactor.connectTCP(host, port, factory)
+        reactor.connectTCP(factory.host, factory.port, factory)
     return factory
 
 
