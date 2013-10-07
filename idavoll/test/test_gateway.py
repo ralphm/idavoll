@@ -296,6 +296,25 @@ class DeleteResourceTest(unittest.TestCase):
         return d
 
 
+    def test_postMalformedXMPPURI(self):
+        """
+        If the XMPP URI is malformed, Bad Request is returned.
+        """
+        request = DummyRequest([b''])
+        request.method = b'POST'
+
+        def rendered(result):
+            self.assertEqual(http.BAD_REQUEST, request.responseCode)
+
+        uri = 'xmpp:@@@@'
+        request.args[b'uri'] = [uri]
+        request.content = StringIO(b'')
+
+        d = _render(self.resource, request)
+        d.addCallback(rendered)
+        return d
+
+
     def test_postURIMissing(self):
         """
         If no URI is passed, 400 Bad Request is returned.
@@ -311,6 +330,7 @@ class DeleteResourceTest(unittest.TestCase):
         d = _render(self.resource, request)
         d.addCallback(rendered)
         return d
+
 
 
 class CallbackResourceTest(unittest.TestCase):

@@ -189,15 +189,14 @@ class DeleteResource(resource.Resource):
             failure.trap(error.NodeNotFound)
             raise Error(http.NOT_FOUND, "Node not found")
 
-        def trapXMPPURIParseError(failure):
-            failure.trap(XMPPURIParseError)
-            raise Error(http.BAD_REQUEST,
-                        "Malformed XMPP URI: %s" % failure.value)
-
         if not request.args.get('uri'):
             raise Error(http.BAD_REQUEST, "No URI given")
 
-        jid, nodeIdentifier = getServiceAndNode(request.args['uri'][0])
+        try:
+            jid, nodeIdentifier = getServiceAndNode(request.args['uri'][0])
+        except XMPPURIParseError, e:
+            raise Error(http.BAD_REQUEST, "Malformed XMPP URI: %s" % e)
+
 
         data = request.content.read()
         if data:
@@ -210,7 +209,6 @@ class DeleteResource(resource.Resource):
                                     redirectURI)
         d.addCallback(toResponse)
         d.addErrback(trapNotFound)
-        d.addErrback(trapXMPPURIParseError)
         return d
 
 
