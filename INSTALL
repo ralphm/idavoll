@@ -14,8 +14,8 @@ Requirements
 
 For the PostgreSQL backend, the following is also required:
 
-- PostgreSQL
-- pyPgSQL
+- PostgreSQL (including development files for psycopg2)
+- psycopg2
 
 
 Installation

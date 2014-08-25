@@ -480,10 +480,11 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         from idavoll.pgsql_storage import Storage
         from twisted.enterprise import adbapi
         if self.dbpool is None:
-            self.__class__.dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+            self.__class__.dbpool = adbapi.ConnectionPool('psycopg2',
                                             database='pubsub_test',
                                             cp_reconnect=True,
                                             client_encoding='utf-8',
+                                            connection_factory=NamedTupleConnection,
                                             )
         self.s = Storage(self.dbpool)
         self.dbpool.start()
@@ -493,7 +494,8 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
 
 
     def tearDown(self):
-        return self.dbpool.runInteraction(self.cleandb)
+        d = self.dbpool.runInteraction(self.cleandb)
+        return d.addCallback(lambda _: self.dbpool.close())
 
 
     def init(self, cursor):
@@ -505,15 +507,15 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-reconfigured')""")
         cursor.execute("""INSERT INTO nodes (node) VALUES ('to-be-purged')""")
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       OWNER.userhost())
+                       (OWNER.userhost(),))
         cursor.execute("""INSERT INTO affiliations
                           (node_id, entity_id, affiliation)
                           SELECT node_id, entity_id, 'owner'
                           FROM nodes, entities
                           WHERE node='pre-existing' AND jid=%s""",
-                       OWNER.userhost())
+                       (OWNER.userhost(),))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER.userhost())
+                       (SUBSCRIBER.userhost(),))
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, state)
                           SELECT node_id, entity_id, %s, 'subscribed'
@@ -522,7 +524,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                        (SUBSCRIBER.resource,
                         SUBSCRIBER.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER_TO_BE_DELETED.userhost())
+                       (SUBSCRIBER_TO_BE_DELETED.userhost(),))
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, state)
                           SELECT node_id, entity_id, %s, 'subscribed'
@@ -531,7 +533,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                        (SUBSCRIBER_TO_BE_DELETED.resource,
                         SUBSCRIBER_TO_BE_DELETED.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       SUBSCRIBER_PENDING.userhost())
+                       (SUBSCRIBER_PENDING.userhost(),))
         cursor.execute("""INSERT INTO subscriptions
                           (node_id, entity_id, resource, state)
                           SELECT node_id, entity_id, %s, 'pending'
@@ -540,7 +542,7 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                        (SUBSCRIBER_PENDING.resource,
                         SUBSCRIBER_PENDING.userhost()))
         cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                       PUBLISHER.userhost())
+                       (PUBLISHER.userhost(),))
         cursor.execute("""INSERT INTO items
                           (node_id, publisher, item, data, date)
                           SELECT node_id, %s, 'to-be-deleted', %s,
@@ -569,18 +571,22 @@ class PgsqlStorageStorageTestCase(unittest.TestCase, StorageTests):
                            'new 1', 'new 2', 'new 3', 'to-be-reconfigured',
                            'to-be-purged')""")
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       OWNER.userhost())
+                       (OWNER.userhost(),))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER.userhost())
+                       (SUBSCRIBER.userhost(),))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER_TO_BE_DELETED.userhost())
+                       (SUBSCRIBER_NEW.userhost(),))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       SUBSCRIBER_PENDING.userhost())
+                       (SUBSCRIBER_TO_BE_DELETED.userhost(),))
         cursor.execute("""DELETE FROM entities WHERE jid=%s""",
-                       PUBLISHER.userhost())
+                       (SUBSCRIBER_PENDING.userhost(),))
+        cursor.execute("""DELETE FROM entities WHERE jid=%s""",
+                       (PUBLISHER.userhost(),))
+
 
 try:
-    import pyPgSQL
-    pyPgSQL
+    import psycopg2
+    psycopg2
+    from psycopg2.extras import NamedTupleConnection
 except ImportError:
-    PgsqlStorageStorageTestCase.skip = "pyPgSQL not available"
+    PgsqlStorageStorageTestCase.skip = "psycopg2 not available"

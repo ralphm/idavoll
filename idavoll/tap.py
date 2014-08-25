@@ -49,7 +49,8 @@ def makeService(config):
     if config['backend'] == 'pgsql':
         from twisted.enterprise import adbapi
         from idavoll.pgsql_storage import Storage
-        dbpool = adbapi.ConnectionPool('pyPgSQL.PgSQL',
+        from psycopg2.extras import NamedTupleConnection
+        dbpool = adbapi.ConnectionPool('psycopg2',
                                        user=config['dbuser'],
                                        password=config['dbpass'],
                                        database=config['dbname'],
@@ -57,6 +58,7 @@ def makeService(config):
                                        port=config['dbport'],
                                        cp_reconnect=True,
                                        client_encoding='utf-8',
+                                       connection_factory=NamedTupleConnection,
                                        )
         st = Storage(dbpool)
     elif config['backend'] == 'memory':

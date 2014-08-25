@@ -5,7 +5,6 @@ import copy
 
 from zope.interface import implements
 
-from twisted.enterprise import adbapi
 from twisted.words.protocols.jabber import jid
 
 from wokkel.generic import parseXml, stripNamespace
@@ -96,17 +95,16 @@ class Storage:
                            (nodeIdentifier,
                             config['pubsub#persist_items'],
                             config['pubsub#deliver_payloads'],
-                            config['pubsub#send_last_published_item'])
-                           )
-        except cursor._pool.dbapi.OperationalError:
+                            config['pubsub#send_last_published_item']))
+        except cursor._pool.dbapi.IntegrityError:
             raise error.NodeExists()
 
-        cursor.execute("""SELECT 1 from entities where jid=%s""",
-                       (owner))
+        cursor.execute("""SELECT 1 as bool from entities where jid=%s""",
+                       (owner,))
 
         if not cursor.fetchone():
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                           (owner))
+                           (owner,))
 
         cursor.execute("""INSERT INTO affiliations
                           (node_id, entity_id, affiliation)
@@ -176,7 +174,7 @@ class Node:
 
     def _checkNodeExists(self, cursor):
         cursor.execute("""SELECT node_id FROM nodes WHERE node=%s""",
-                       (self.nodeIdentifier))
+                       (self.nodeIdentifier,))
         if not cursor.fetchone():
             raise error.NodeNotFound()
 
@@ -259,6 +257,7 @@ class Node:
                        (self.nodeIdentifier,
                         userhost,
                         resource))
+
         row = cursor.fetchone()
         if not row:
             return None
@@ -278,14 +277,14 @@ class Node:
                    FROM subscriptions
                    NATURAL JOIN nodes
                    NATURAL JOIN entities
-                   WHERE node=%s""";
+                   WHERE node=%s"""
         values = [self.nodeIdentifier]
 
         if state:
             query += " AND state=%s"
             values.append(state)
 
-        cursor.execute(query, values);
+        cursor.execute(query, values)
         rows = cursor.fetchall()
 
         subscriptions = []
@@ -294,9 +293,9 @@ class Node:
 
             options = {}
             if row.subscription_type:
-                options['pubsub#subscription_type'] = row.subscription_type;
+                options['pubsub#subscription_type'] = row.subscription_type
             if row.subscription_depth:
-                options['pubsub#subscription_depth'] = row.subscription_depth;
+                options['pubsub#subscription_depth'] = row.subscription_depth
 
             subscriptions.append(Subscription(self.nodeIdentifier, subscriber,
                                               row.state, options))
@@ -320,9 +319,9 @@ class Node:
 
         try:
             cursor.execute("""INSERT INTO entities (jid) VALUES (%s)""",
-                           (userhost))
-        except cursor._pool.dbapi.OperationalError:
-            pass
+                           (userhost,))
+        except cursor._pool.dbapi.IntegrityError:
+            cursor.connection.rollback()
 
         try:
             cursor.execute("""INSERT INTO subscriptions
@@ -340,7 +339,7 @@ class Node:
                             subscription_depth,
                             self.nodeIdentifier,
                             userhost))
-        except cursor._pool.dbapi.OperationalError:
+        except cursor._pool.dbapi.IntegrityError:
             raise error.SubscriptionExists()
 
 
@@ -377,7 +376,7 @@ class Node:
     def _isSubscribed(self, cursor, entity):
         self._checkNodeExists(cursor)
 
-        cursor.execute("""SELECT 1 FROM entities
+        cursor.execute("""SELECT 1 as bool FROM entities
                           NATURAL JOIN subscriptions
                           NATURAL JOIN nodes
                           WHERE entities.jid=%s
@@ -399,7 +398,7 @@ class Node:
                           NATURAL JOIN affiliations
                           NATURAL JOIN entities
                           WHERE node=%s""",
-                       self.nodeIdentifier)
+                       (self.nodeIdentifier,))
         result = cursor.fetchall()
 
         return [(jid.internJID(r[0]), r[1]) for r in result]
@@ -481,7 +480,7 @@ class LeafNode(Node):
                            (self.nodeIdentifier,
                             maxItems))
         else:
-            cursor.execute(query, (self.nodeIdentifier))
+            cursor.execute(query, (self.nodeIdentifier,))
 
         result = cursor.fetchall()
         items = [stripNamespace(parseXml(r[0])) for r in result]
@@ -540,28 +539,28 @@ class GatewayStorage(object):
         """
         cursor.execute("""SELECT count(*) FROM callbacks
                           WHERE service=%s and node=%s""",
-                       service.full(),
-                       nodeIdentifier)
+                       (service.full(),
+                        nodeIdentifier))
         results = cursor.fetchall()
         return results[0][0]
 
 
     def addCallback(self, service, nodeIdentifier, callback):
         def interaction(cursor):
-            cursor.execute("""SELECT 1 FROM callbacks
+            cursor.execute("""SELECT 1 as bool FROM callbacks
                               WHERE service=%s and node=%s and uri=%s""",
-                           service.full(),
+                           (service.full(),
                            nodeIdentifier,
-                           callback)
+                           callback))
             if cursor.fetchall():
                 return
 
             cursor.execute("""INSERT INTO callbacks
                               (service, node, uri) VALUES
                               (%s, %s, %s)""",
-                           service.full(),
+                           (service.full(),
                            nodeIdentifier,
-                           callback)
+                           callback))
 
         return self.dbpool.runInteraction(interaction)
 
@@ -570,9 +569,9 @@ class GatewayStorage(object):
         def interaction(cursor):
             cursor.execute("""DELETE FROM callbacks
                               WHERE service=%s and node=%s and uri=%s""",
-                           service.full(),
-                           nodeIdentifier,
-                           callback)
+                           (service.full(),
+                            nodeIdentifier,
+                            callback))
 
             if cursor.rowcount != 1:
                 raise error.NotSubscribed()
@@ -586,8 +585,8 @@ class GatewayStorage(object):
         def interaction(cursor):
             cursor.execute("""SELECT uri FROM callbacks
                               WHERE service=%s and node=%s""",
-                           service.full(),
-                           nodeIdentifier)
+                           (service.full(),
+                            nodeIdentifier))
             results = cursor.fetchall()
 
             if not results:
